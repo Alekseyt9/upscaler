@@ -1,16 +1,14 @@
 package run
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"text/template"
 
-	"github.com/gin-contrib/gzip"
-
 	"github.com/Alekseyt9/upscaler/internal/front/config"
-	"github.com/gin-gonic/gin"
 )
 
 type PageData struct {
@@ -19,11 +17,10 @@ type PageData struct {
 
 func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	r := Router(cfg, log)
+	httpRouter := Router(cfg, log)
 
 	log.Info("Server started", "url", cfg.Address)
-	err := r.Run(cfg.Address)
+	err := http.ListenAndServe(cfg.Address, httpRouter)
 	if err != nil {
 		return err
 	}
@@ -31,23 +28,22 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-	setupFileServer(r, cfg)
-	//setupHandlers(r, s, rm, pm, ws, log)
-	return r
+func Router(cfg *config.Config, logger *slog.Logger) http.Handler {
+	mux := http.NewServeMux()
+	setupFileServer(mux, cfg, logger)
+	// setupHandlers(mux, s, rm, pm, ws, logger)
+	return mux
 }
 
-func setupFileServer(r *gin.Engine, cfg *config.Config) {
-	r.Use(gzip.Gzip(gzip.BestCompression))
-
+func setupFileServer(mux *http.ServeMux, cfg *config.Config, _ *slog.Logger) {
 	contentDir := filepath.Join("..", "..", "internal", "front", "content")
-	r.StaticFS("/content", http.Dir(contentDir))
 
-	r.GET("/", func(c *gin.Context) {
-		if c.Request.URL.Path != "/" {
-			c.String(http.StatusNotFound, "Page not found")
+	fs := http.FileServer(http.Dir(contentDir))
+	mux.Handle("/content/", http.StripPrefix("/content/", fs))
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
 			return
 		}
 		tmplPath := filepath.Join(contentDir, "index.html")
@@ -57,10 +53,10 @@ func setupFileServer(r *gin.Engine, cfg *config.Config) {
 		data := PageData{
 			FrontURL: fURL,
 		}
-		c.Writer.Header().Set("Content-Type", "text/html")
-		err := tmpl.Execute(c.Writer, data)
+		w.Header().Set("Content-Type", "text/html")
+		err := tmpl.Execute(w, data)
 		if err != nil {
-			c.String(http.StatusInternalServerError, "Failed to render template: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to render template: %v", err), http.StatusInternalServerError)
 			return
 		}
 	})
