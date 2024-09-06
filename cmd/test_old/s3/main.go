@@ -2,45 +2,67 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"net/url"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
+	"github.com/spf13/pflag"
 )
 
-func main() {
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if service == s3.ServiceID {
-			return aws.Endpoint{
-				PartitionID: "yc",
-				URL:         "https://storage.yandexcloud.net",
-			}, nil
+type CustomS3EndpointResolverV2 struct{}
+
+func (r *CustomS3EndpointResolverV2) ResolveEndpoint(ctx context.Context, params s3.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	if *params.Region == "ru-central1" {
+		uri, err := url.Parse("https://storage.yandexcloud.net")
+		if err != nil {
+			return smithyendpoints.Endpoint{}, err
 		}
-		return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
-	})
+
+		return smithyendpoints.Endpoint{
+			URI:        *uri,
+			Headers:    nil,
+			Properties: smithy.Properties{},
+		}, nil
+	}
+
+	return smithyendpoints.Endpoint{}, &aws.EndpointNotFoundError{}
+}
+
+func main() {
+	var keys string
+	pflag.StringVarP(&keys, "secrets", "s", "", "Access Key ID and Secret Access Key separated by ';'")
+	pflag.Parse()
+	if keys == "" {
+		log.Fatal("Keys must be provided")
+	}
+	keyParts := strings.Split(keys, ";")
+	if len(keyParts) != 2 {
+		log.Fatal("Invalid format for keys, expected format: 'AccessKeyID;SecretAccessKey'")
+	}
+	accessKeyID := keyParts[0]
+	secretAccessKey := keyParts[1]
 
 	cfg, err := config.LoadDefaultConfig(
-		context.Background(),
-		config.WithEndpointResolverWithOptions(customResolver),
+		context.TODO(),
+		config.WithRegion("ru-central1"),
 		config.WithCredentialsProvider(
-			&credentials.StaticCredentialsProvider{
-				Value: aws.Credentials{
-					AccessKeyID:     "",
-					SecretAccessKey: "",
-				},
-			},
+			credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
 		),
-		config.WithRegion("auto"),
 	)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client := s3.NewFromConfig(cfg)
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.EndpointResolverV2 = &CustomS3EndpointResolverV2{}
+	})
 
 	result, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 	if err != nil {

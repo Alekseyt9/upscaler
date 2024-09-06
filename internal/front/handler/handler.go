@@ -1,8 +1,11 @@
 package handler
 
+import "github.com/Alekseyt9/upscaler/internal/front/services/s3stor"
+
 type FrontHandler struct {
+	s3 s3stor.S3Store
 }
 
-func New() *FrontHandler {
-	return &FrontHandler{}
+func New(s3 s3stor.S3Store) *FrontHandler {
+	return &FrontHandler{s3: s3}
 }
