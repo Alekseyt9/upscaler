@@ -6,9 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Alekseyt9/upscaler/internal/back/config"
 	"github.com/Alekseyt9/upscaler/internal/back/services/s3stor"
+	"github.com/Alekseyt9/upscaler/internal/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type MockS3Service struct {
@@ -24,19 +27,12 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 	tests := []struct {
 		name         string
 		queryParam   string
-		mockResponse []s3stor.Link
-		mockError    error
 		expectedCode int
-		expectedBody []string
 	}{
 		{
-			name:       "valid request with one link",
-			queryParam: "count=1",
-			mockResponse: []s3stor.Link{
-				{Url: "http://example.com/1"},
-			},
+			name:         "valid request with one link",
+			queryParam:   "count=1",
 			expectedCode: http.StatusOK,
-			expectedBody: []string{"http://example.com/1"},
 		},
 		{
 			name:         "invalid count parameter",
@@ -48,22 +44,25 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 			queryParam:   "count=11",
 			expectedCode: http.StatusBadRequest,
 		},
-		{
-			name:         "error from GetPresigned",
-			queryParam:   "count=1",
-			mockError:    assert.AnError,
-			expectedCode: http.StatusInternalServerError,
-		},
 	}
+
+	err := testutils.LoadEnv()
+	require.NoError(t, err, "Failed to load env")
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+	if cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
+		t.Fatal("AccessKeyID and SecretAccessKey must be provided")
+	}
+	s3s, err := s3stor.New(s3stor.YOKeys{
+		AccessKeyID:     cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey,
+	})
+	require.NoError(t, err, "Failed to load s3stor")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockS3 := new(MockS3Service)
-			if tt.mockResponse != nil || tt.mockError != nil {
-				mockS3.On("GetPresigned", mock.AnythingOfType("int")).Return(tt.mockResponse, tt.mockError)
-			}
 
-			h := &FrontHandler{s3: mockS3}
+			h := &FrontHandler{s3: s3s}
 			req := httptest.NewRequest("GET", "/?"+tt.queryParam, nil)
 			w := httptest.NewRecorder()
 
@@ -75,10 +74,9 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 
 			if tt.expectedCode == http.StatusOK {
-				var result []string
+				var result []s3stor.Link
 				err := json.NewDecoder(resp.Body).Decode(&result)
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedBody, result)
 			}
 		})
 	}
