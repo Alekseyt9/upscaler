@@ -1,6 +1,6 @@
 package handler
 
-import "github.com/Alekseyt9/upscaler/internal/front/services/s3stor"
+import "github.com/Alekseyt9/upscaler/internal/back/services/s3stor"
 
 type FrontHandler struct {
 	s3 s3stor.S3Store

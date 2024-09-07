@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/Alekseyt9/upscaler/internal/front/config"
+	"github.com/Alekseyt9/upscaler/internal/back/config"
 )
 
 type PageData struct {
@@ -19,8 +19,8 @@ func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	httpRouter := Router(cfg, log)
 
-	log.Info("Server started", "url", cfg.Address)
-	err := http.ListenAndServe(cfg.Address, httpRouter)
+	log.Info("Server started", "url", cfg.BackAddress)
+	err := http.ListenAndServe(cfg.BackAddress, httpRouter)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func setupFileServer(mux *http.ServeMux, cfg *config.Config, _ *slog.Logger) {
 		tmplPath := filepath.Join(contentDir, "index.html")
 		tmpl := template.Must(template.ParseFiles(tmplPath))
 
-		fURL := cfg.Address
+		fURL := cfg.BackAddress
 		data := PageData{
 			FrontURL: fURL,
 		}

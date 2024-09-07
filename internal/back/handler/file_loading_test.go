@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Alekseyt9/upscaler/internal/front/services/s3stor"
+	"github.com/Alekseyt9/upscaler/internal/back/services/s3stor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -67,7 +67,7 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 			req := httptest.NewRequest("GET", "/?"+tt.queryParam, nil)
 			w := httptest.NewRecorder()
 
-			h.GetPresignedURLs(w, req)
+			h.GetRequisites(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()
