@@ -9,8 +9,8 @@ import (
 )
 
 // POST
-func (h *FrontHandler) FinishFilesLoading(w http.ResponseWriter, r *http.Request) {
-	// recieve right files ids and names
+func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request) {
+	// recieve files ids and names
 	var links []s3stor.Link
 	if err := json.NewDecoder(r.Body).Decode(&links); err != nil {
 		http.Error(w, "deserializing links", http.StatusBadRequest)
@@ -18,15 +18,13 @@ func (h *FrontHandler) FinishFilesLoading(w http.ResponseWriter, r *http.Request
 	}
 
 	// all files have already loaded to s3
-
 	// create messages for kafka
 	// store messages to transaction outbox
 	// store tasks to db
-
 }
 
 // GET
-func (h *FrontHandler) GetRequisites(w http.ResponseWriter, r *http.Request) {
+func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 	count, err := strconv.Atoi(r.URL.Query().Get("count"))
 	if err != nil {
 		http.Error(w, "'count' parameter must be a valid integer", http.StatusBadRequest)
@@ -53,4 +51,9 @@ func (h *FrontHandler) GetRequisites(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(links); err != nil {
 		http.Error(w, "error encoding json", http.StatusInternalServerError)
 	}
+}
+
+// GET
+func (h *FrontHandler) GetState(w http.ResponseWriter, r *http.Request) {
+
 }

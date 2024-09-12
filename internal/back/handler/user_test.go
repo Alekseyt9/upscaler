@@ -65,7 +65,7 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 			req := httptest.NewRequest("GET", "/?"+tt.queryParam, nil)
 			w := httptest.NewRecorder()
 
-			h.GetRequisites(w, req)
+			h.GetUploadURLs(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()

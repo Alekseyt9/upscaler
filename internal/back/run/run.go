@@ -1,19 +1,13 @@
 package run
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
 )
-
-type PageData struct {
-	FrontURL string
-}
 
 func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -30,34 +24,18 @@ func Run(cfg *config.Config) error {
 
 func Router(cfg *config.Config, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
-	setupFileServer(mux, cfg, logger)
+	setupFileServer(mux, logger)
 	// setupHandlers(mux, s, rm, pm, ws, logger)
 	return mux
 }
 
-func setupFileServer(mux *http.ServeMux, cfg *config.Config, _ *slog.Logger) {
+func setupFileServer(mux *http.ServeMux, log *slog.Logger) {
 	contentDir := filepath.Join("..", "..", "internal", "back", "content")
+	log.Info("Serving files from", "contentDir", contentDir)
 
 	fs := http.FileServer(http.Dir(contentDir))
 	mux.Handle("/content/", http.StripPrefix("/content/", fs))
-
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		tmplPath := filepath.Join(contentDir, "index.html")
-		tmpl := template.Must(template.ParseFiles(tmplPath))
-
-		fURL := cfg.BackAddress
-		data := PageData{
-			FrontURL: fURL,
-		}
-		w.Header().Set("Content-Type", "text/html")
-		err := tmpl.Execute(w, data)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to render template: %v", err), http.StatusInternalServerError)
-			return
-		}
+		http.ServeFile(w, r, filepath.Join("..", "..", "internal", "back", "content", "index.html"))
 	})
 }
