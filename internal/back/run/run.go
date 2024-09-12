@@ -36,7 +36,7 @@ func Router(cfg *config.Config, logger *slog.Logger) http.Handler {
 }
 
 func setupFileServer(mux *http.ServeMux, cfg *config.Config, _ *slog.Logger) {
-	contentDir := filepath.Join("..", "..", "internal", "front", "content")
+	contentDir := filepath.Join("..", "..", "internal", "back", "content")
 
 	fs := http.FileServer(http.Dir(contentDir))
 	mux.Handle("/content/", http.StripPrefix("/content/", fs))

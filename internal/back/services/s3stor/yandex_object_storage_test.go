@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
-	"github.com/Alekseyt9/upscaler/internal/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestYOStorage_GetPresigned(t *testing.T) {
-	err := testutils.LoadEnv()
-	require.NoError(t, err, "Failed to load env")
+	//err := envutils.LoadEnv()
+	//require.NoError(t, err, "Failed to load env")
 
 	cfg, err := config.LoadConfig()
 	require.NoError(t, err, "Failed to load config")
