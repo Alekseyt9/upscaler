@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
-	"github.com/Alekseyt9/upscaler/internal/back/services/s3stor"
+	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,9 +17,9 @@ type MockS3Service struct {
 	mock.Mock
 }
 
-func (m *MockS3Service) GetPresigned(count int) ([]s3stor.Link, error) {
+func (m *MockS3Service) GetPresigned(count int) ([]s3store.Link, error) {
 	args := m.Called(count)
-	return args.Get(0).([]s3stor.Link), args.Error(1)
+	return args.Get(0).([]s3store.Link), args.Error(1)
 }
 
 func TestFrontHandler_GetPresignedURLs(t *testing.T) {
@@ -52,7 +52,7 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 	if cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
 		t.Fatal("AccessKeyID and SecretAccessKey must be provided")
 	}
-	s3s, err := s3stor.New(s3stor.YOKeys{
+	s3s, err := s3store.New(s3store.YOKeys{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
 	})
@@ -73,7 +73,7 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 
 			if tt.expectedCode == http.StatusOK {
-				var result []s3stor.Link
+				var result []s3store.Link
 				err := json.NewDecoder(resp.Body).Decode(&result)
 				assert.NoError(t, err)
 			}

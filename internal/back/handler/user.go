@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Alekseyt9/upscaler/internal/back/services/s3stor"
+	s3stor "github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 )
 
 // POST
