@@ -85,7 +85,6 @@
         <table class="queue-table">
             <thead>
                 <tr>
-                    <!--<th>Preview</th>-->
                     <th>File Name</th>
                     <th>Download Link/Queue Position</th>
                     <th>Status</th>
@@ -93,31 +92,26 @@
             </thead>
             <tbody>
                 <tr>
-                    <!--<td><img src="https://images.unsplash.com/photo-1547721064-da6cfb341d50?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDJ8fGZsb3dlcnxlbnwwfHx8fDE2Mjk4NzUyNjI&ixlib=rb-1.2.1&q=80&w=200" alt="preview" width="30" height="30"></td>-->
                     <td>file1.jpg</td>
                     <td>15</td>
                     <td class="status-pending">Pending</td>
                 </tr>
                 <tr>
-                    <!--<td><img src="https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDN8fGZvb2R8ZW58MHx8fHwxNjI5ODc1MjYy&ixlib=rb-1.2.1&q=80&w=200" alt="preview" width="30" height="30"></td>-->
                     <td>file2.jpg</td>
                     <td><a href="https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDN8fGZvb2R8ZW58MHx8fHwxNjI5ODc1MjYy&ixlib=rb-1.2.1&q=80&w=200" download>Download</a></td>
                     <td class="status-processed">Processed</td>
                 </tr>
                 <tr>
-                    <!--<td><img src="https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDZ8fGxhbmRzY2FwZXxlbnwwfHx8fDE2Mjk4NzUyNjI&ixlib=rb-1.2.1&q=80&w=200" alt="preview" width="30" height="30"></td>-->
-                    <td>file3.jpg</td>
+                   <td>file3.jpg</td>
                     <td><a href="https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDZ8fGxhbmRzY2FwZXxlbnwwfHx8fDE2Mjk4NzUyNjI&ixlib=rb-1.2.1&q=80&w=200" download>Download</a></td>
                     <td class="status-processed">Processed</td>
                 </tr>
                 <tr>
-                    <!--<td><img src="https://via.placeholder.com/30" alt="preview" width="30" height="30"></td>-->
                     <td>file4.jpg</td>
                     <td></td>
                     <td class="status-error">Error</td>
                 </tr>
                 <tr>
-                    <!--<td><img src="https://via.placeholder.com/30" alt="preview" width="30" height="30"></td>-->
                     <td>file5.jpg</td>
                     <td></td>
                     <td class="status-outdated">Outdated</td>
@@ -126,35 +120,7 @@
         </table>
     </div>
 
-    <!-- Скрытый элемент для rest -->
-    <div id="front-url" style="display: none;">{{.FrontURL}}</div>
-
-    <script>
-        const dropzone = document.getElementById('dropzone');
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.style.borderColor = '#0056b3';
-        });
-        dropzone.addEventListener('dragleave', () => {
-            dropzone.style.borderColor = '#007bff';
-        });
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.style.borderColor = '#007bff';
-            // Handle dropped files
-        });
-        dropzone.addEventListener('click', () => {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.multiple = true;
-            fileInput.accept = 'image/*';
-            fileInput.addEventListener('change', (e) => {
-                const files = e.target.files;
-                // Handle selected files
-            });
-            fileInput.click();
-        });
-    </script>
+    <script src="content/script.js"></script>
 
 </body>
 </html>

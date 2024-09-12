@@ -22,9 +22,9 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func Router(cfg *config.Config, logger *slog.Logger) http.Handler {
+func Router(cfg *config.Config, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
-	setupFileServer(mux, logger)
+	setupFileServer(mux, log)
 	// setupHandlers(mux, s, rm, pm, ws, logger)
 	return mux
 }
