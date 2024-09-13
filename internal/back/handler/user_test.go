@@ -52,9 +52,10 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 	if cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
 		t.Fatal("AccessKeyID and SecretAccessKey must be provided")
 	}
-	s3s, err := s3store.New(s3store.YOKeys{
+	s3s, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
+		BucketName:      cfg.S3BucketName,
 	})
 	require.NoError(t, err, "Failed to load s3stor")
 

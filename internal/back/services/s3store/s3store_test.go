@@ -1,6 +1,9 @@
 package s3store
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httputil"
 	"testing"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
@@ -9,9 +12,6 @@ import (
 )
 
 func TestYOStorage_GetPresigned(t *testing.T) {
-	//err := envutils.LoadEnv()
-	//require.NoError(t, err, "Failed to load env")
-
 	cfg, err := config.LoadConfig()
 	require.NoError(t, err, "Failed to load config")
 
@@ -19,21 +19,48 @@ func TestYOStorage_GetPresigned(t *testing.T) {
 		t.Fatal("AccessKeyID and SecretAccessKey must be provided")
 	}
 
-	storage, err := New(YOKeys{
+	storage, err := New(S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
+		BucketName:      cfg.S3BucketName,
 	})
 	require.NoError(t, err, "Failed to initialize storage")
 
-	count := 5
+	count := 1
 	objects, err := storage.GetPresigned(count)
 	require.NoError(t, err, "Failed to generate presigned URLs")
 
 	assert.Equal(t, count, len(objects), "Expected number of presigned URLs does not match")
 
-	for _, obj := range objects {
-		//t.Log("url", obj.Url)
-		assert.NotEmpty(t, obj.Url, "Presigned URL should not be empty")
-		assert.NotEmpty(t, obj.Key, "Key should not be empty")
-	}
+	url := objects[0].Url
+
+	// Тестовые данные для загрузки
+	testData := []byte("This is a test content for uploading to Yandex Object Storage.")
+
+	// Создаем новый HTTP-запрос PUT
+	req, err := http.NewRequest("PUT", url, bytes.NewReader(testData))
+	require.NoError(t, err, "Failed to create new HTTP request")
+
+	// Не устанавливаем дополнительных заголовков
+
+	// Логируем запрос
+	requestDump, err := httputil.DumpRequestOut(req, true)
+	require.NoError(t, err, "Failed to dump request")
+	t.Logf("Request:\n%s", string(requestDump))
+
+	// Выполняем запрос
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err, "Failed to perform HTTP request")
+	defer resp.Body.Close()
+
+	// Логируем ответ
+	responseDump, err := httputil.DumpResponse(resp, true)
+	require.NoError(t, err, "Failed to dump response")
+	t.Logf("Response:\n%s", string(responseDump))
+
+	// Проверяем статус ответа
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "Expected HTTP status 200 OK")
+
+	// Дополнительные проверки...
 }

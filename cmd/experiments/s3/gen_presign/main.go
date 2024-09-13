@@ -6,13 +6,12 @@ import (
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	smithyendpoints "github.com/aws/smithy-go/endpoints"
 
 	cfg "github.com/Alekseyt9/upscaler/internal/back/config"
+	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 )
 
 type CustomS3EndpointResolverV2 struct{}
@@ -44,28 +43,21 @@ func main() {
 		log.Fatal("AccessKeyID and SecretAccessKey must be provided")
 	}
 
-	cfg, err := config.LoadDefaultConfig(
-		context.TODO(),
-		config.WithRegion("ru-central1"),
-		config.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(c.S3AccessKeyID, c.S3SecretAccessKey, ""),
-		),
-	)
+	log.Println("c.S3BucketName", c.S3BucketName)
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.EndpointResolverV2 = &CustomS3EndpointResolverV2{}
+	s3, err := s3store.New(s3store.S3Options{
+		AccessKeyID:     c.S3AccessKeyID,
+		SecretAccessKey: c.S3SecretAccessKey,
+		BucketName:      c.S3BucketName,
 	})
-
-	result, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 
-	for _, bucket := range result.Buckets {
-		log.Printf("bucket=%s creation time=%s", aws.ToString(bucket.Name), bucket.CreationDate.Format("2006-01-02 15:04:05 Monday"))
+	links, err := s3.GetPresigned(1)
+	if err != nil {
+		log.Panicln(err)
 	}
+
+	log.Println(links[0].Url)
 }

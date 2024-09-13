@@ -2,6 +2,7 @@ package s3store
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -11,21 +12,19 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	bucketName = "upscaler" // todo move
-)
-
 type S3Store interface {
 	GetPresigned(count int) ([]Link, error)
 }
 
 type YOStorage struct {
 	client *s3.Client
+	opts   S3Options
 }
 
-type YOKeys struct {
+type S3Options struct {
 	AccessKeyID     string
 	SecretAccessKey string
+	BucketName      string
 }
 
 type Link struct {
@@ -33,13 +32,14 @@ type Link struct {
 	Key string
 }
 
-func New(keys YOKeys) (*YOStorage, error) {
-	c, err := initStorage(keys)
+func New(opt S3Options) (*YOStorage, error) {
+	c, err := initStorage(opt)
 	if err != nil {
 		return nil, err
 	}
 	inst := YOStorage{
 		client: c,
+		opts:   opt,
 	}
 
 	return &inst, err
@@ -52,9 +52,12 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	for i := 0; i < count; i++ {
 		key := uuid.New().String()
 
+		log.Println("!!", s.opts.BucketName)
+
 		req, err := presignClient.PresignPutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(bucketName),
+			Bucket: aws.String(s.opts.BucketName),
 			Key:    aws.String(key),
+			//ContentType: aws.String("image/jpeg"),
 		}, s3.WithPresignExpires(time.Hour*24*30))
 
 		if err != nil {
@@ -70,33 +73,25 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	return objects, nil
 }
 
-func initStorage(keys YOKeys) (*s3.Client, error) {
-	cfg, err := config.LoadDefaultConfig(
-		context.TODO(),
+func initStorage(opts S3Options) (*s3.Client, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion("ru-central1"),
-		config.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(keys.AccessKeyID, keys.SecretAccessKey, ""),
-		),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(opts.AccessKeyID, opts.SecretAccessKey, "")),
+		config.WithEndpointResolver(aws.EndpointResolverFunc(
+			func(service, region string) (aws.Endpoint, error) {
+				return aws.Endpoint{
+					URL:           "https://storage.yandexcloud.net",
+					SigningRegion: region,
+				}, nil
+			})),
 	)
-
 	if err != nil {
-		return nil, err
+		panic("Ошибка загрузки конфигурации: " + err.Error())
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.EndpointResolverV2 = &CustomS3EndpointResolverV2{}
+		o.UsePathStyle = true
 	})
-
-	/*
-		result, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, bucket := range result.Buckets {
-			log.Printf("bucket=%s creation time=%s", aws.ToString(bucket.Name), bucket.CreationDate.Format("2006-01-02 15:04:05 Monday"))
-		}
-	*/
 
 	return client, nil
 }
