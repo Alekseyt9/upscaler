@@ -5,26 +5,29 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Alekseyt9/upscaler/internal/back/model"
 	s3stor "github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 )
 
 // POST
 func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request) {
-	// recieve files ids and names
 	var links []s3stor.Link
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&links); err != nil {
-		h.log.Error("CompleFilesUpload", "error", err)
-		http.Error(w, "deserializing links", http.StatusBadRequest)
+		h.log.Error("deserializing links", "error", err)
+		http.Error(w, "deserializing links", http.StatusInternalServerError)
+		return
+	}
+	//h.log.Info("CompleFilesUpload", "links", links)
+
+	err := h.store.CreateTask(model.StoreTask{})
+	if err != nil {
+		h.log.Error("store.CreateTask", "error", err)
+		http.Error(w, "store.CreateTask", http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Info("CompleFilesUpload", "links", links)
-
-	// all files have already loaded to s3
-	// create messages for kafka
-	// store messages to transaction outbox
-	// store tasks to db
+	w.WriteHeader(http.StatusOK)
 }
 
 // GET

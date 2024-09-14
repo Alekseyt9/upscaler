@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/handler"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
 	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
+	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 )
 
 func Run(cfg *config.Config) error {
@@ -50,8 +52,13 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) err
 	if err != nil {
 		return err
 	}
-	h := handler.New(s3, log)
 
+	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN)
+	if err != nil {
+		return err
+	}
+
+	h := handler.New(s3, log, store)
 	mux.HandleFunc("/api/getuploadurls", h.GetUploadURLs)
 	mux.HandleFunc("/api/completefilesupload", h.CompleFilesUpload)
 	mux.HandleFunc("/api/getstate", h.GetState)

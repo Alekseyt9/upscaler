@@ -1,9 +1,11 @@
 package store
 
-type Store interface {
-	SaveMessage()
-	LoadMessages()
-	MarkSendedMessages()
+import "github.com/Alekseyt9/upscaler/internal/back/model"
 
-	SaveTask()
+type Store interface {
+	// add to queue, userfiles, outbox
+	CreateTask(model.StoreTask) error
+
+	// get user state
+	GetState(userId int64) ([]model.UserItem, error)
 }
