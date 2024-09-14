@@ -1,6 +1,6 @@
-
-
 const dropzone = document.getElementById('dropzone');
+const loadingPanel = document.getElementById('loadingPanel');
+
 dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropzone.style.borderColor = '#0056b3';
@@ -13,7 +13,7 @@ dropzone.addEventListener('dragleave', () => {
 dropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.style.borderColor = '#007bff';
-    
+
     const files = e.dataTransfer.files;
     handleFileUpload(files);
 });
@@ -31,6 +31,10 @@ dropzone.addEventListener('click', () => {
 });
 
 function handleFileUpload(files) {
+    loadingPanel.style.display = 'block';
+    dropzone.style.pointerEvents = 'none';
+    dropzone.style.opacity = '0.5'; 
+
     const fileCount = files.length;
     const baseUrl = window.location.origin;
     const uploadUrl = `${baseUrl}/api/getuploadurls`;
@@ -41,65 +45,59 @@ function handleFileUpload(files) {
     .then(response => response.json())
     .then(data => {
         console.log('Upload URLs:', data);
-                // Проверяем, что количество файлов соответствует количеству URL-адресов
-                if (data.length !== files.length) {
-                    throw new Error('Количество файлов не соответствует количеству URL-адресов');
-                }
-        
-                // Создаем массив промисов для загрузки файлов
-                const uploadPromises = data.map((item, index) => {
-                    const file = files[index];
-                    const url = item.Url;
-        
-                    
-                    return fetch(url, {
-                        method: 'PUT',
-                        body: file,
-                        headers: {
-                            'Content-Type': file.type, 
-                            //'x-amz-acl': 'public-read',
-                        },
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Ошибка при загрузке файла ${file.name}: ${response.statusText}`);
-                        }
-                        console.log(`Файл ${file.name} успешно загружен.`);
-                    })
-                    .catch(error => {
-                        console.error(`Ошибка при загрузке файла ${file.name}:`, error);
-                    });
+        if (data.length !== files.length) {
+            throw new Error('Количество файлов не соответствует количеству URL-адресов');
+        }
 
-                    /*
-                    return axios.put(url, file, {
-                        headers: {
-                            'Content-Type': file.type,
-                            // Если нужно добавить дополнительные заголовки, такие как 'x-amz-acl', можно добавить их здесь
-                            //'x-amz-acl': 'public-read',
-                        },
-                        onUploadProgress: (progressEvent) => {
-                            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                            console.log(`Загрузка ${file.name}: ${percentCompleted}% завершено`);
-                        }
-                    })
-                    .then(response => {
-                        console.log(`Файл ${file.name} успешно загружен.`);
-                    })
-                    .catch(error => {
-                        console.error(`Ошибка при загрузке файла ${file.name}:`, error);
-                    });*/
+        const uploadPromises = data.map((item, index) => {
+            const file = files[index];
+            const url = item.Url;
+
+            return fetch(url, {
+                method: 'PUT',
+                body: file,
+                headers: {
+                    'Content-Type': file.type,
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Ошибка при загрузке файла ${file.name}: ${response.statusText}`);
+                }
+                console.log(`Файл ${file.name} успешно загружен.`);
+            })
+            .catch(error => {
+                console.error(`Ошибка при загрузке файла ${file.name}:`, error);
+                throw error; 
+            });
+        });
+
+        Promise.all(uploadPromises)
+            .then(() => {
+                console.log('Все файлы успешно загружены.');
+
+                return fetch(`${baseUrl}/api/completefilesupload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
                 });
-        
-                // Ждем завершения всех загрузок
-                Promise.all(uploadPromises)
-                    .then(() => {
-                        console.log('Все файлы успешно загружены.');
-                    })
-                    .catch(error => {
-                        console.error('Ошибка при загрузке файлов:', error);
-                    });
+            })
+            .catch(error => {
+                console.error('Ошибка при загрузке файлов:', error);
+            })
+            .finally(() => {
+                loadingPanel.style.display = 'none';
+                dropzone.style.pointerEvents = 'auto';
+                dropzone.style.opacity = '1'; 
+            });
     })
     .catch(error => {
         console.error('Error fetching upload URLs:', error);
+
+        loadingPanel.style.display = 'none';
+        dropzone.style.pointerEvents = 'auto';
+        dropzone.style.opacity = '1';
     });
 }

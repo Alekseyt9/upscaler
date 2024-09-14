@@ -29,7 +29,7 @@ func Router(cfg *config.Config, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	setupHandlers(mux, cfg)
+	setupHandlers(mux, cfg, log)
 	setupMiddlware(mux, log)
 	handler := setupMiddlware(mux, log)
 
@@ -41,7 +41,7 @@ func setupMiddlware(h http.Handler, log *slog.Logger) http.Handler {
 	return handler
 }
 
-func setupHandlers(mux *http.ServeMux, cfg *config.Config) error {
+func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
@@ -50,7 +50,7 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	h := handler.New(s3)
+	h := handler.New(s3, log)
 
 	mux.HandleFunc("/api/getuploadurls", h.GetUploadURLs)
 	mux.HandleFunc("/api/completefilesupload", h.CompleFilesUpload)

@@ -2,7 +2,6 @@ package s3store
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -52,12 +51,9 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	for i := 0; i < count; i++ {
 		key := uuid.New().String()
 
-		log.Println("!!", s.opts.BucketName)
-
 		req, err := presignClient.PresignPutObject(context.TODO(), &s3.PutObjectInput{
 			Bucket: aws.String(s.opts.BucketName),
 			Key:    aws.String(key),
-			//ContentType: aws.String("image/jpeg"),
 		}, s3.WithPresignExpires(time.Hour*24*30))
 
 		if err != nil {

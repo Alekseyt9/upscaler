@@ -12,10 +12,14 @@ import (
 func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request) {
 	// recieve files ids and names
 	var links []s3stor.Link
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&links); err != nil {
+		h.log.Error("CompleFilesUpload", "error", err)
 		http.Error(w, "deserializing links", http.StatusBadRequest)
 		return
 	}
+
+	h.log.Info("CompleFilesUpload", "links", links)
 
 	// all files have already loaded to s3
 	// create messages for kafka
@@ -39,12 +43,6 @@ func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "GetPresigned error", http.StatusInternalServerError)
 	}
-
-	/*
-		urls := make([]string, 0)
-		for _, v := range links {
-			urls = append(urls, v.Url)
-		}*/
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
