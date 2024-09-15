@@ -5,7 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
 	"github.com/Alekseyt9/upscaler/internal/back/handler"
@@ -17,25 +20,60 @@ import (
 
 func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	httpRouter, err := Router(cfg, log)
+
+	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
 	if err != nil {
 		return err
 	}
 
-	log.Info("Server started", "url", cfg.BackAddress)
-	err = http.ListenAndServe(cfg.BackAddress, httpRouter)
+	httpRouter, err := Router(cfg, log, store)
 	if err != nil {
 		return err
 	}
+
+	server := &http.Server{
+		Addr:    cfg.BackAddress,
+		Handler: httpRouter,
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		log.Info("Server started", "url", cfg.BackAddress)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("Server failed", "error", err)
+			cancel()
+		}
+	}()
+
+	<-stop
+	log.Info("Shutting down gracefully...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Error("Server shutdown failed", "error", err)
+	}
+
+	if err := store.Close(); err != nil {
+		log.Error("Store shutdown failed", "error", err)
+	}
+
+	log.Info("Server shutdown completed")
 
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger) (http.Handler, error) {
+func Router(cfg *config.Config, log *slog.Logger, store store.Store) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	err := setupHandlers(mux, cfg, log)
+	err := setupHandlers(mux, cfg, log, store)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +88,7 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 	return handler
 }
 
-func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) error {
+func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
@@ -60,17 +98,12 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) err
 		return err
 	}
 
-	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
-	if err != nil {
-		return err
-	}
-
 	ho := handler.HandlerOptions{
 		JWTSecret: cfg.JWTSecret,
 	}
 	h := handler.New(s3, log, store, ho)
 	mux.HandleFunc("/api/user/getuploadurls", h.GetUploadURLs)
-	mux.HandleFunc("/api/user/completefilesupload", h.CompleFilesUpload)
+	mux.HandleFunc("/api/user/completefilesupload", h.CompleteFilesUpload)
 	mux.HandleFunc("/api/user/getstate", h.GetState)
 	mux.HandleFunc("/api/auth/login", h.Login)
 

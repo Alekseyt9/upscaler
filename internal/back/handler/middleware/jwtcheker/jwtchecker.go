@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -59,7 +60,16 @@ func WithJWTCheck(h http.Handler, JWTSecret string, log *slog.Logger) http.Handl
 	return http.HandlerFunc(fn)
 }
 
-func GetUserID(r *http.Request) (string, bool) {
-	userID, ok := r.Context().Value(userIDContextKey).(string)
-	return userID, ok
+func GetUserID(r *http.Request) (int64, bool) {
+	userIDStr, ok := r.Context().Value(userIDContextKey).(string)
+	if !ok {
+		return 0, false
+	}
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return userID, true
 }

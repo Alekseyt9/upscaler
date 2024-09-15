@@ -10,7 +10,7 @@ import (
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres" // needs for init
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,7 +41,7 @@ func NewPostgresStore(ctx context.Context, connString string, log *slog.Logger) 
 
 func (s *PostgresStore) runMigrations(connString string, log *slog.Logger) error {
 	mPath := getMigrationPath()
-	log.Info("runMigrations", "mPath", mPath)
+	//log.Info("runMigrations", "mPath", mPath)
 
 	m, err := migrate.New(mPath, connString)
 	if err != nil {
@@ -64,14 +64,99 @@ func getMigrationPath() string {
 	return "file://" + migrationsPath
 }
 
-// CreateTask adds a task to the queue, userfiles, outbox.
-func (s *PostgresStore) CreateTask(task model.StoreTask) error {
+// CreateTasks adds a tasks to the queue, userfiles, outbox.
+func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
+	tx, err := s.pool.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(context.Background())
+		} else {
+			err = tx.Commit(context.Background())
+		}
+	}()
+
+	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
+	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
+						   VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	insertOutboxStmt := `INSERT INTO outbox (payload, status) 
+						 VALUES ($1, 'PENDING')`
+
+	for _, task := range tasks {
+		var queueID int
+		err = tx.QueryRow(context.Background(),
+			insertQueueStmt).Scan(&queueID)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(context.Background(),
+			insertUserFileStmt,
+			queueID, task.UserID, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING")
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(context.Background(),
+			insertOutboxStmt,
+			task.Payload)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // GetState retrieves the user state based on the userId.
 func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
-	return nil, nil
+	query := `
+	WITH queue_positions AS (
+		SELECT 
+			id,
+			ROW_NUMBER() OVER (ORDER BY id) AS position 
+		FROM queue
+	)
+	SELECT
+		uf.order_num,                 
+		uf.src_file_url,             
+		uf.dest_file_url,             
+		COALESCE(qp.position, -1),    
+		uf.state                      
+	FROM
+		userfiles uf
+	LEFT JOIN
+		queue_positions qp ON uf.queue_id = qp.id
+	WHERE
+		uf.user_id = $1
+	ORDER BY
+		uf.order_num
+	`
+
+	rows, err := s.pool.Query(context.Background(), query, userId)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при выполнении запроса состояния пользователя: %w", err)
+	}
+	defer rows.Close()
+
+	var userItems []model.UserItem
+
+	for rows.Next() {
+		var item model.UserItem
+		err := rows.Scan(&item.Order, &item.FileName, &item.Link, &item.QueuePosition, &item.Status)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании строки: %w", err)
+		}
+		userItems = append(userItems, item)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("ошибка при итерации по строкам: %w", rows.Err())
+	}
+
+	return userItems, nil
 }
 
 // GetState retrieves the user state based on the userId.
@@ -92,6 +177,7 @@ func (s *PostgresStore) CreateUser() (int64, error) {
 }
 
 // Close closes the connection pool.
-func (s *PostgresStore) Close() {
+func (s *PostgresStore) Close() error {
 	s.pool.Close()
+	return nil
 }

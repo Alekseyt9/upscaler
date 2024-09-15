@@ -11,7 +11,14 @@ import (
 )
 
 // POST
-func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request) {
+func (h *FrontHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Request) {
+	userID, ok := jwtcheker.GetUserID(r)
+	if !ok {
+		h.log.Error("GetUserID", "not found", ok)
+		http.Error(w, "GetUserID", http.StatusInternalServerError)
+	}
+	h.log.Info("GetUserID", "userID", userID)
+
 	var links []s3stor.Link
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&links); err != nil {
@@ -20,10 +27,29 @@ func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err := h.store.CreateTask(model.StoreTask{})
+	tasks := make([]model.StoreTask, 0)
+	for _, link := range links { // TODO
+		task := model.StoreTask{
+			UserID:     userID,
+			SrcFileURL: link.Url,
+			SrcFileKey: link.Key,
+		}
+		tasks = append(tasks, task)
+	}
+
+	/*
+		UserID      int64  // ID of the user who owns the file
+		SrcFileURL  string // URL of the source file
+		SrcFileKey  string // Key of the source file
+		DestFileURL string // URL of the destination (processed) file
+		DestFileKey string // Key of the destination file
+		Payload     string
+	*/
+
+	err := h.store.CreateTasks(tasks)
 	if err != nil {
-		h.log.Error("store.CreateTask", "error", err)
-		http.Error(w, "store.CreateTask", http.StatusInternalServerError)
+		h.log.Error("store.CreateTasks", "error", err)
+		http.Error(w, "store.CreateTasks", http.StatusInternalServerError)
 		return
 	}
 
@@ -63,7 +89,14 @@ func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 
 // GET
 func (h *FrontHandler) GetState(w http.ResponseWriter, r *http.Request) {
-	items, err := h.store.GetState(0) // TODO user
+	userID, ok := jwtcheker.GetUserID(r)
+	if !ok {
+		h.log.Error("GetUserID", "not found", ok)
+		http.Error(w, "GetUserID", http.StatusInternalServerError)
+	}
+	h.log.Info("GetUserID", "userID", userID)
+
+	items, err := h.store.GetState(userID)
 	if err != nil {
 		h.log.Error("store.GetState", "error", err)
 		http.Error(w, "store.GetState", http.StatusInternalServerError)
