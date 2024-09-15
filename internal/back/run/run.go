@@ -46,7 +46,7 @@ func Router(cfg *config.Config, log *slog.Logger) (http.Handler, error) {
 
 func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.Handler {
 	handler := logger.WithLogging(h, log)
-	handler = jwtcheker.WithJWTCheck(handler, cfg.JWTSecret)
+	handler = jwtcheker.WithJWTCheck(handler, cfg.JWTSecret, log)
 	return handler
 }
 
@@ -69,9 +69,10 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) err
 		JWTSecret: cfg.JWTSecret,
 	}
 	h := handler.New(s3, log, store, ho)
-	mux.HandleFunc("/api/getuploadurls", h.GetUploadURLs)
-	mux.HandleFunc("/api/completefilesupload", h.CompleFilesUpload)
-	mux.HandleFunc("/api/getstate", h.GetState)
+	mux.HandleFunc("/api/user/getuploadurls", h.GetUploadURLs)
+	mux.HandleFunc("/api/user/completefilesupload", h.CompleFilesUpload)
+	mux.HandleFunc("/api/user/getstate", h.GetState)
+	mux.HandleFunc("/api/auth/login", h.Login)
 
 	return nil
 }

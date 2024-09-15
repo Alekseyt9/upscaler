@@ -35,6 +35,8 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.createUserAndSetToken(w)
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter) {
@@ -62,6 +64,7 @@ func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter) {
 		Value:    tokenString,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
+		Path:     "/",
 	})
 
 	w.Write([]byte("Новый токен сгенерирован и установлен в куки"))

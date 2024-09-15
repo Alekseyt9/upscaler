@@ -1,3 +1,29 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const baseUrl = window.location.origin;
+    const loginUrl = `${baseUrl}/api/auth/login`;
+
+    fetch(loginUrl, {
+        method: 'POST', 
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}), 
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка при авторизации: ${response.statusText}`);
+        }
+        return response.json(); 
+    })
+    .then(data => {
+        console.log('Авторизация успешна:', data);
+    })
+    .catch(error => {
+        console.error('Ошибка при авторизации:', error);
+    });
+});
+
 const dropzone = document.getElementById('dropzone');
 const loadingPanel = document.getElementById('loadingPanel');
 
@@ -37,10 +63,11 @@ function handleFileUpload(files) {
 
     const fileCount = files.length;
     const baseUrl = window.location.origin;
-    const uploadUrl = `${baseUrl}/api/getuploadurls`;
+    const uploadUrl = `${baseUrl}/api/user/getuploadurls`;
 
     fetch(`${uploadUrl}?count=${fileCount}`, {
         method: 'GET',
+        credentials: 'include',
     })
     .then(response => response.json())
     .then(data => {
@@ -76,8 +103,9 @@ function handleFileUpload(files) {
             .then(() => {
                 console.log('Все файлы успешно загружены.');
 
-                return fetch(`${baseUrl}/api/completefilesupload`, {
+                return fetch(`${baseUrl}/api/user/completefilesupload`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                     },

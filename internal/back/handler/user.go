@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	s3stor "github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 )
@@ -31,6 +32,13 @@ func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request)
 
 // GET
 func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := jwtcheker.GetUserID(r)
+	if !ok {
+		h.log.Error("GetUserID", "not found", ok)
+		http.Error(w, "GetUserID", http.StatusInternalServerError)
+	}
+	h.log.Info("GetUserID", "userID", userID)
+
 	count, err := strconv.Atoi(r.URL.Query().Get("count"))
 	if err != nil {
 		http.Error(w, "'count' parameter must be a valid integer", http.StatusBadRequest)

@@ -76,7 +76,19 @@ func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
 
 // GetState retrieves the user state based on the userId.
 func (s *PostgresStore) CreateUser() (int64, error) {
-	return 0, nil
+	query := `
+        INSERT INTO users (created_at)
+        VALUES (NOW())
+        RETURNING id;
+    `
+	var userID int64
+
+	err := s.pool.QueryRow(context.Background(), query).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
 }
 
 // Close closes the connection pool.
