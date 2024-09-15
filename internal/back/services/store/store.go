@@ -8,4 +8,6 @@ type Store interface {
 
 	// get user state
 	GetState(userId int64) ([]model.UserItem, error)
+
+	CreateUser() (int64, error)
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -9,14 +10,14 @@ import (
 
 // POST
 func (h *FrontHandler) Register(w http.ResponseWriter, r *http.Request) {
-
+	// not implemented
 }
 
 // POST
 func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("jwt")
 	if err != nil || cookie.Value == "" {
-		h.generateAndSetToken(w, "some_user_id")
+		h.createUserAndSetToken(w)
 		return
 	}
 
@@ -24,7 +25,7 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return []byte(h.opt.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		h.generateAndSetToken(w, "some_user_id")
+		h.createUserAndSetToken(w)
 		return
 	}
 
@@ -32,11 +33,19 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 		userId := claims["userId"].(string)
 		w.Write([]byte("User ID from token: " + userId))
 	} else {
-		h.generateAndSetToken(w, "some_user_id")
+		h.createUserAndSetToken(w)
 	}
 }
 
-func (h *FrontHandler) generateAndSetToken(w http.ResponseWriter, userId string) {
+func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter) {
+	id, err := h.store.CreateUser()
+	if err != nil {
+		h.log.Error("store.CreateUser", "error", err)
+		http.Error(w, "store.CreateUser", http.StatusInternalServerError)
+		return
+	}
+
+	userId := strconv.FormatInt(id, 10)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"userId": userId,
 		"exp":    time.Now().Add(time.Hour * 24).Unix(),

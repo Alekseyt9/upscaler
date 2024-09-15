@@ -17,10 +17,13 @@ import (
 
 func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	httpRouter := Router(cfg, log)
+	httpRouter, err := Router(cfg, log)
+	if err != nil {
+		return err
+	}
 
 	log.Info("Server started", "url", cfg.BackAddress)
-	err := http.ListenAndServe(cfg.BackAddress, httpRouter)
+	err = http.ListenAndServe(cfg.BackAddress, httpRouter)
 	if err != nil {
 		return err
 	}
@@ -28,14 +31,17 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger) http.Handler {
+func Router(cfg *config.Config, log *slog.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	setupHandlers(mux, cfg, log)
+	err := setupHandlers(mux, cfg, log)
+	if err != nil {
+		return nil, err
+	}
 	handler := setupMiddlware(mux, log, cfg)
 
-	return handler
+	return handler, nil
 }
 
 func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.Handler {
@@ -54,7 +60,7 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) err
 		return err
 	}
 
-	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN)
+	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
 	if err != nil {
 		return err
 	}

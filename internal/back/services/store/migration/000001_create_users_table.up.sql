@@ -21,10 +21,10 @@ CREATE TABLE userfiles (
     user_id INTEGER NOT NULL,          		-- идентификатор пользователя
     order_num SERIAL,                  		-- порядок
     src_file_url TEXT NOT NULL,             -- URL исходного файла
-    src_file_key TEXT NOT NULL              -- ключ исходного файла
+    src_file_key TEXT NOT NULL,             -- ключ исходного файла
     dest_file_url TEXT NOT NULL,            -- URL обработанного файла
     dest_file_key TEXT NOT NULL,            -- ключ обработанного файла
-    state TEXT NOT NULL				        -- состояние задачи: PENDING/PROCESSED/ERROR/OUTDATED
+    state TEXT NOT NULL,				    -- состояние задачи: PENDING/PROCESSED/ERROR/OUTDATED
     created_at TIMESTAMPTZ DEFAULT NOW(),   -- время создания записи
 
     CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
