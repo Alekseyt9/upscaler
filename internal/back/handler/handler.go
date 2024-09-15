@@ -11,12 +11,18 @@ type FrontHandler struct {
 	s3    s3store.S3Store
 	log   *slog.Logger
 	store store.Store
+	opt   HandlerOptions
 }
 
-func New(s3 s3store.S3Store, log *slog.Logger, store store.Store) *FrontHandler {
+type HandlerOptions struct {
+	JWTSecret string
+}
+
+func New(s3 s3store.S3Store, log *slog.Logger, store store.Store, opt HandlerOptions) *FrontHandler {
 	return &FrontHandler{
 		s3:    s3,
 		log:   log,
 		store: store,
+		opt:   opt,
 	}
 }

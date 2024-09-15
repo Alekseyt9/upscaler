@@ -9,6 +9,7 @@ import (
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
 	"github.com/Alekseyt9/upscaler/internal/back/handler"
+	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
 	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
@@ -32,14 +33,14 @@ func Router(cfg *config.Config, log *slog.Logger) http.Handler {
 
 	setupFileServer(mux, log)
 	setupHandlers(mux, cfg, log)
-	setupMiddlware(mux, log)
-	handler := setupMiddlware(mux, log)
+	handler := setupMiddlware(mux, log, cfg)
 
 	return handler
 }
 
-func setupMiddlware(h http.Handler, log *slog.Logger) http.Handler {
+func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.Handler {
 	handler := logger.WithLogging(h, log)
+	handler = jwtcheker.WithJWTCheck(handler, cfg.JWTSecret)
 	return handler
 }
 
@@ -58,7 +59,10 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger) err
 		return err
 	}
 
-	h := handler.New(s3, log, store)
+	ho := handler.HandlerOptions{
+		JWTSecret: cfg.JWTSecret,
+	}
+	h := handler.New(s3, log, store, ho)
 	mux.HandleFunc("/api/getuploadurls", h.GetUploadURLs)
 	mux.HandleFunc("/api/completefilesupload", h.CompleFilesUpload)
 	mux.HandleFunc("/api/getstate", h.GetState)

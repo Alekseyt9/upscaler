@@ -18,7 +18,6 @@ func (h *FrontHandler) CompleFilesUpload(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "deserializing links", http.StatusInternalServerError)
 		return
 	}
-	//h.log.Info("CompleFilesUpload", "links", links)
 
 	err := h.store.CreateTask(model.StoreTask{})
 	if err != nil {
@@ -39,7 +38,7 @@ func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if count > 10 {
-		http.Error(w, "max count = 10", http.StatusBadRequest)
+		http.Error(w, "max files count = 10", http.StatusBadRequest)
 	}
 
 	links, err := h.s3.GetPresigned(count)
@@ -56,5 +55,16 @@ func (h *FrontHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 
 // GET
 func (h *FrontHandler) GetState(w http.ResponseWriter, r *http.Request) {
+	items, err := h.store.GetState(0) // TODO user
+	if err != nil {
+		h.log.Error("store.GetState", "error", err)
+		http.Error(w, "store.GetState", http.StatusInternalServerError)
+		return
+	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(items); err != nil {
+		http.Error(w, "error encoding json", http.StatusInternalServerError)
+	}
 }

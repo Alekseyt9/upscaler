@@ -11,13 +11,6 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	/*
-		err := godotenv.Load()
-		if err != nil {
-			log.Println("warning: .env file not found, using system environment variables")
-		}
-	*/
-
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
 		return nil, err
