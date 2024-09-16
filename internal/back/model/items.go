@@ -1,12 +1,18 @@
 package model
 
 type StoreTask struct {
-	UserID      int64  // ID of the user who owns the file
+	UserID      int64 // ID of the user who owns the file
+	FileName    string
 	SrcFileURL  string // URL of the source file
 	SrcFileKey  string // Key of the source file
 	DestFileURL string // URL of the destination (processed) file
 	DestFileKey string // Key of the destination file
-	//Payload     string // Payload to be inserted into the outbox table (must be a JSONB type)
+}
+
+type UploadedFile struct {
+	Url  string
+	Key  string
+	Name string
 }
 
 type UserItem struct {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/model"
-	s3stor "github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 )
 
 // POST
@@ -19,15 +18,15 @@ func (h *FrontHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Reques
 	}
 	h.log.Info("GetUserID", "userID", userID)
 
-	var links []s3stor.Link
+	var fileInfos []model.UploadedFile
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&links); err != nil {
-		h.log.Error("deserializing links", "error", err)
-		http.Error(w, "deserializing links", http.StatusInternalServerError)
+	if err := json.NewDecoder(r.Body).Decode(&fileInfos); err != nil {
+		h.log.Error("deserializing fileInfos", "error", err)
+		http.Error(w, "deserializing fileInfos", http.StatusInternalServerError)
 		return
 	}
 
-	dlinks, err := h.s3.GetPresigned(len(links))
+	dlinks, err := h.s3.GetPresigned(len(fileInfos))
 	if err != nil {
 		h.log.Error("GetPresigned", "error", err)
 		http.Error(w, "GetPresigned error", http.StatusInternalServerError)
@@ -35,16 +34,17 @@ func (h *FrontHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Reques
 	}
 
 	tasks := make([]model.StoreTask, 0)
-	for i := range links {
-		link := links[i]
+	for i := range fileInfos {
+		fileInfo := fileInfos[i]
 		dlink := dlinks[i]
 
 		task := model.StoreTask{
 			UserID:      userID,
-			SrcFileURL:  link.Url,
-			SrcFileKey:  link.Key,
+			SrcFileURL:  fileInfo.Url,
+			SrcFileKey:  fileInfo.Key,
 			DestFileURL: dlink.Url,
 			DestFileKey: dlink.Key,
+			FileName:    fileInfo.Name,
 		}
 		tasks = append(tasks, task)
 	}

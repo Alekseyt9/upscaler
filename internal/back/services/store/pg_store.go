@@ -79,8 +79,8 @@ func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
 	}()
 
 	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
-	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
-						   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, file_name, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
+						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	insertOutboxStmt := `INSERT INTO outbox (payload, status) 
 						 VALUES ($1, 'PENDING')`
 
@@ -94,7 +94,7 @@ func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
 		var taskId int
 		err = tx.QueryRow(context.Background(),
 			insertUserFileStmt,
-			queueID, task.UserID, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING").Scan(&taskId)
+			queueID, task.UserID, task.FileName, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING").Scan(&taskId)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
 	)
 	SELECT
 		uf.order_num,                 
-		uf.src_file_url,             
+		uf.file_name,             
 		uf.dest_file_url,             
 		COALESCE(qp.position, -1),    
 		uf.state                      
@@ -156,6 +156,9 @@ func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
 	for rows.Next() {
 		var item model.UserItem
 		err := rows.Scan(&item.Order, &item.FileName, &item.Link, &item.QueuePosition, &item.Status)
+		if item.Status == "PENDING" { // TODO to const
+			item.Link = ""
+		}
 		if err != nil {
 			return nil, fmt.Errorf("ошибка при сканировании строки: %w", err)
 		}

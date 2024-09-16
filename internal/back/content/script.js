@@ -168,13 +168,22 @@ function handleFileUpload(files) {
             .then(() => {
                 console.log('Все файлы успешно загружены.');
 
+                fileInfos = []
+                for(var i=0; i<data.length; i++){
+                    fileInfos.push({
+                        Url: data[i].Url, 
+                        Key: data[i].Key, 
+                        Name: files[i].name,
+                    });
+                }
+
                 return fetch(`${baseUrl}/api/user/completefilesupload`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify(fileInfos),
                 });
             })
             .catch(error => {
@@ -184,6 +193,9 @@ function handleFileUpload(files) {
                 loadingPanel.style.display = 'none';
                 dropzone.style.pointerEvents = 'auto';
                 dropzone.style.opacity = '1'; 
+
+                // refresh
+                loadTableData()
             });
     })
     .catch(error => {
