@@ -29,6 +29,8 @@ CREATE TABLE userfiles (
 
     CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_userfiles_user_id_order_num ON userfiles(user_id, order_num);
+CREATE INDEX idx_userfiles_queue_id ON userfiles(queue_id);
 
 -- transaction outbox для отправки в очередь сообщений
 CREATE TABLE outbox (
