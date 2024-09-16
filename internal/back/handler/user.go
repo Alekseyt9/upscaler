@@ -27,26 +27,29 @@ func (h *FrontHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	dlinks, err := h.s3.GetPresigned(len(links))
+	if err != nil {
+		h.log.Error("GetPresigned", "error", err)
+		http.Error(w, "GetPresigned error", http.StatusInternalServerError)
+		return
+	}
+
 	tasks := make([]model.StoreTask, 0)
-	for _, link := range links { // TODO
+	for i := range links {
+		link := links[i]
+		dlink := dlinks[i]
+
 		task := model.StoreTask{
-			UserID:     userID,
-			SrcFileURL: link.Url,
-			SrcFileKey: link.Key,
+			UserID:      userID,
+			SrcFileURL:  link.Url,
+			SrcFileKey:  link.Key,
+			DestFileURL: dlink.Url,
+			DestFileKey: dlink.Key,
 		}
 		tasks = append(tasks, task)
 	}
 
-	/*
-		UserID      int64  // ID of the user who owns the file
-		SrcFileURL  string // URL of the source file
-		SrcFileKey  string // Key of the source file
-		DestFileURL string // URL of the destination (processed) file
-		DestFileKey string // Key of the destination file
-		Payload     string
-	*/
-
-	err := h.store.CreateTasks(tasks)
+	err = h.store.CreateTasks(tasks)
 	if err != nil {
 		h.log.Error("store.CreateTasks", "error", err)
 		http.Error(w, "store.CreateTasks", http.StatusInternalServerError)

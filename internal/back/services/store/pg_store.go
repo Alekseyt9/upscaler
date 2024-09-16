@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -31,7 +32,7 @@ func NewPostgresStore(ctx context.Context, connString string, log *slog.Logger) 
 		pool: pool,
 		log:  log,
 	}
-	err = store.runMigrations(connString, log)
+	err = store.runMigrations(connString)
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +40,8 @@ func NewPostgresStore(ctx context.Context, connString string, log *slog.Logger) 
 	return store, nil
 }
 
-func (s *PostgresStore) runMigrations(connString string, log *slog.Logger) error {
+func (s *PostgresStore) runMigrations(connString string) error {
 	mPath := getMigrationPath()
-	//log.Info("runMigrations", "mPath", mPath)
 
 	m, err := migrate.New(mPath, connString)
 	if err != nil {
@@ -80,28 +80,38 @@ func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
 
 	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
 	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
-						   VALUES ($1, $2, $3, $4, $5, $6, $7)`
+						   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 	insertOutboxStmt := `INSERT INTO outbox (payload, status) 
 						 VALUES ($1, 'PENDING')`
 
 	for _, task := range tasks {
 		var queueID int
-		err = tx.QueryRow(context.Background(),
-			insertQueueStmt).Scan(&queueID)
+		err = tx.QueryRow(context.Background(), insertQueueStmt).Scan(&queueID)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec(context.Background(),
+		var taskId int
+		err = tx.QueryRow(context.Background(),
 			insertUserFileStmt,
-			queueID, task.UserID, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING")
+			queueID, task.UserID, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING").Scan(&taskId)
+		if err != nil {
+			return err
+		}
+
+		payload := model.BrokerMessage{
+			SrcFileURL:  task.SrcFileURL,
+			DestFileURL: task.DestFileURL,
+			TaskId:      int64(taskId),
+		}
+		plJson, err := json.Marshal(payload)
 		if err != nil {
 			return err
 		}
 
 		_, err = tx.Exec(context.Background(),
 			insertOutboxStmt,
-			task.Payload)
+			plJson)
 		if err != nil {
 			return err
 		}

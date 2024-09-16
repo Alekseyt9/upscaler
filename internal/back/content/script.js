@@ -14,15 +14,80 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!response.ok) {
             throw new Error(`Ошибка при авторизации: ${response.statusText}`);
         }
-        return response.json(); 
-    })
-    .then(data => {
-        console.log('Авторизация успешна:', data);
+        console.log('Авторизация успешна');
+        loadTableData();
     })
     .catch(error => {
         console.error('Ошибка при авторизации:', error);
     });
 });
+
+function loadTableData() {
+    fetch('/api/user/getstate')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка сети');
+            }
+            return response.json();
+        })
+        .then(data => {
+            createTableRows(data);
+        })
+        .catch(error => {
+            console.error('Ошибка при получении данных:', error);
+        });
+}
+
+function createTableRows(data) {
+    const tableBody = document.querySelector('.queue-table tbody');
+    tableBody.innerHTML = '';
+
+    if (!data){
+        return;
+    }
+
+    data.forEach(item => {
+        const row = document.createElement('tr');
+
+        const fileNameCell = document.createElement('td');
+        fileNameCell.textContent = item.FileName;
+        row.appendChild(fileNameCell);
+
+        const linkCell = document.createElement('td');
+        if (item.Link) {
+            const link = document.createElement('a');
+            link.href = item.Link;
+            link.textContent = 'Скачать';
+            link.setAttribute('download', item.FileName);
+            linkCell.appendChild(link);
+        } else {
+            linkCell.textContent = item.QueuePosition;
+        }
+        row.appendChild(linkCell);
+
+        const statusCell = document.createElement('td');
+        statusCell.textContent = item.Status;
+        switch (item.Status.toLowerCase()) {
+            case 'processed':
+                statusCell.classList.add('status-processed');
+                break;
+            case 'pending':
+                statusCell.classList.add('status-pending');
+                break;
+            case 'error':
+                statusCell.classList.add('status-error');
+                break;
+            case 'outdated':
+                statusCell.classList.add('status-outdated');
+                break;
+            default:
+                break;
+        }
+        row.appendChild(statusCell);
+
+        tableBody.appendChild(row);
+    });
+}
 
 const dropzone = document.getElementById('dropzone');
 const loadingPanel = document.getElementById('loadingPanel');

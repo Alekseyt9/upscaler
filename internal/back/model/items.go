@@ -6,7 +6,7 @@ type StoreTask struct {
 	SrcFileKey  string // Key of the source file
 	DestFileURL string // URL of the destination (processed) file
 	DestFileKey string // Key of the destination file
-	Payload     string // Payload to be inserted into the outbox table (must be a JSONB type)
+	//Payload     string // Payload to be inserted into the outbox table (must be a JSONB type)
 }
 
 type UserItem struct {
@@ -15,4 +15,16 @@ type UserItem struct {
 	Link          string
 	QueuePosition int
 	Status        string
+}
+
+type BrokerMessage struct {
+	SrcFileURL  string
+	DestFileURL string
+	TaskId      int64
+}
+
+type BrokerMessageResult struct {
+	TaskId int64
+	Result string
+	Error  string
 }
