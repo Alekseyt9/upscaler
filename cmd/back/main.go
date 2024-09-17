@@ -3,10 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/Alekseyt9/upscaler/internal/back/config"
-	"github.com/Alekseyt9/upscaler/internal/back/run"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/Alekseyt9/upscaler/internal/proc/config"
 )
 
 func main() {
@@ -15,8 +12,12 @@ func main() {
 		log.Println("config load error: " + err.Error())
 	}
 
-	err = run.Run(cfg)
-	if err != nil {
-		log.Println("server startup error: " + err.Error())
-	}
+	log.Println(cfg)
+
+	/*
+		err = run.Run(cfg)
+		if err != nil {
+			log.Println("server startup error: " + err.Error())
+		}
+	*/
 }
