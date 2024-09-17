@@ -11,14 +11,14 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type Sender struct {
+type Producer struct {
 	store    store.Store
 	producer sarama.SyncProducer
 	interval time.Duration
 	quit     chan struct{}
 }
 
-func NewSender(store store.Store, kafkaBrokers []string) (*Sender, error) {
+func NewProducer(store store.Store, kafkaBrokers []string) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
@@ -29,7 +29,7 @@ func NewSender(store store.Store, kafkaBrokers []string) (*Sender, error) {
 		return nil, err
 	}
 
-	sender := &Sender{
+	sender := &Producer{
 		store:    store,
 		producer: producer,
 		interval: 3 * time.Second,
@@ -41,7 +41,7 @@ func NewSender(store store.Store, kafkaBrokers []string) (*Sender, error) {
 	return sender, nil
 }
 
-func (s *Sender) startSending() {
+func (s *Producer) startSending() {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
@@ -59,7 +59,7 @@ func (s *Sender) startSending() {
 	}
 }
 
-func (s *Sender) sendMessagesBatch() error {
+func (s *Producer) sendMessagesBatch() error {
 	err := s.store.SendTasksToBroker(context.Background(), func(items []model.OutboxItem) error {
 		var messages []*sarama.ProducerMessage
 		for _, item := range items {
@@ -86,7 +86,7 @@ func (s *Sender) sendMessagesBatch() error {
 	return nil
 }
 
-func (s *Sender) Stop() {
+func (s *Producer) Stop() {
 	close(s.quit)
 	s.producer.Close()
 }

@@ -27,16 +27,7 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 
-	s3, err := s3store.New(s3store.S3Options{
-		AccessKeyID:     cfg.S3AccessKeyID,
-		SecretAccessKey: cfg.S3SecretAccessKey,
-		BucketName:      cfg.S3BucketName,
-	})
-	if err != nil {
-		return err
-	}
-
-	httpRouter, err := Router(cfg, log, store, s3)
+	httpRouter, err := Router(cfg, log, store)
 	if err != nil {
 		return err
 	}
@@ -79,11 +70,11 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store) (http.Handler, error) {
+func Router(cfg *config.Config, log *slog.Logger, store store.Store) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	err := setupHandlers(mux, cfg, log, store, s3)
+	err := setupHandlers(mux, cfg, log, store)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +89,7 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 	return handler
 }
 
-func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store) error {
+func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,

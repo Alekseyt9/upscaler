@@ -8,7 +8,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 	"github.com/Alekseyt9/upscaler/internal/proc/services/fileprocessor"
 	"github.com/Alekseyt9/upscaler/internal/proc/services/idcheck"
-	"github.com/Alekseyt9/upscaler/internal/proc/services/messagebroker"
+	"github.com/Alekseyt9/upscaler/internal/proc/services/producer"
 	"github.com/Alekseyt9/upscaler/pkg/workerpool"
 )
 
@@ -18,19 +18,19 @@ type ProcessorService struct {
 	log      *slog.Logger
 	fileproc *fileprocessor.FileProcessor
 	idcheck  *idcheck.IdCheckService
-	broker   *messagebroker.MessageBroker
+	producer *producer.Producer
 }
 
 func New(wpool *workerpool.WorkerPool, s3store s3store.S3Store,
 	log *slog.Logger, fileproc *fileprocessor.FileProcessor,
-	idcheck *idcheck.IdCheckService, broker *messagebroker.MessageBroker) *ProcessorService {
+	idcheck *idcheck.IdCheckService, producer *producer.Producer) *ProcessorService {
 	proc := &ProcessorService{
 		wpool:    wpool,
 		s3store:  s3store,
 		log:      log,
 		fileproc: fileproc,
 		idcheck:  idcheck,
-		broker:   broker,
+		producer: producer,
 	}
 	return proc
 }
@@ -73,7 +73,7 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 			Result: resMsg,
 			Error:  errMsg,
 		}
-		err = p.broker.Send(rmsg)
+		err = p.producer.Send(rmsg)
 		if err != nil {
 			p.log.Error("broker.Send", "error", err)
 			return
