@@ -34,3 +34,8 @@ type BrokerMessageResult struct {
 	Result string
 	Error  string
 }
+
+type OutboxItem struct {
+	Payload string
+	IdKey   string
+}

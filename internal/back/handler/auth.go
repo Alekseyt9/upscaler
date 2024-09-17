@@ -17,7 +17,7 @@ func (h *FrontHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("jwt")
 	if err != nil || cookie.Value == "" {
-		h.createUserAndSetToken(w)
+		h.createUserAndSetToken(w, r)
 		return
 	}
 
@@ -25,7 +25,7 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return []byte(h.opt.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		h.createUserAndSetToken(w)
+		h.createUserAndSetToken(w, r)
 		return
 	}
 
@@ -33,14 +33,14 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 		userId := claims["userId"].(string)
 		w.Write([]byte("User ID from token: " + userId))
 	} else {
-		h.createUserAndSetToken(w)
+		h.createUserAndSetToken(w, r)
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter) {
-	id, err := h.store.CreateUser()
+func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) {
+	id, err := h.store.CreateUser(r.Context())
 	if err != nil {
 		h.log.Error("store.CreateUser", "error", err)
 		http.Error(w, "store.CreateUser", http.StatusInternalServerError)

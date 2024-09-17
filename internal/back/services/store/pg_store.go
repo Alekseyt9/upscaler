@@ -14,6 +14,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lib/pq"
 )
 
 type PostgresStore struct {
@@ -65,36 +66,37 @@ func getMigrationPath() string {
 }
 
 // CreateTasks adds a tasks to the queue, userfiles, outbox.
-func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
-	tx, err := s.pool.Begin(context.Background())
+func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) error {
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback(context.Background())
+			_ = tx.Rollback(ctx)
 		} else {
-			err = tx.Commit(context.Background())
+			err = tx.Commit(ctx)
 		}
 	}()
 
 	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
 	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, file_name, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
-						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
-	insertOutboxStmt := `INSERT INTO outbox (payload, status) 
-						 VALUES ($1, 'PENDING')`
+						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+	insertOutboxStmt := `INSERT INTO outbox (payload, status, idempotency_key) 
+						 VALUES ($1, 'PENDING', $2)`
 
 	for _, task := range tasks {
 		var queueID int
-		err = tx.QueryRow(context.Background(), insertQueueStmt).Scan(&queueID)
+		err = tx.QueryRow(ctx, insertQueueStmt).Scan(&queueID)
 		if err != nil {
 			return err
 		}
 
-		var taskId int
-		err = tx.QueryRow(context.Background(),
+		var fileId int64
+		err = tx.QueryRow(ctx,
 			insertUserFileStmt,
-			queueID, task.UserID, task.FileName, task.SrcFileURL, task.SrcFileKey, task.DestFileURL, task.DestFileKey, "PENDING").Scan(&taskId)
+			queueID, task.UserID, task.FileName, task.SrcFileURL, task.SrcFileKey, task.DestFileURL,
+			task.DestFileKey, "PENDING").Scan(&fileId)
 		if err != nil {
 			return err
 		}
@@ -102,16 +104,14 @@ func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
 		payload := model.BrokerMessage{
 			SrcFileURL:  task.SrcFileURL,
 			DestFileURL: task.DestFileURL,
-			TaskId:      int64(taskId),
+			TaskId:      fileId,
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec(context.Background(),
-			insertOutboxStmt,
-			plJson)
+		_, err = tx.Exec(ctx, insertOutboxStmt, plJson, fileId)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func (s *PostgresStore) CreateTasks(tasks []model.StoreTask) error {
 }
 
 // GetState retrieves the user state based on the userId.
-func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
+func (s *PostgresStore) GetState(ctx context.Context, userId int64) ([]model.UserItem, error) {
 	query := `
 	WITH queue_positions AS (
 		SELECT 
@@ -145,7 +145,7 @@ func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
 		uf.order_num
 	`
 
-	rows, err := s.pool.Query(context.Background(), query, userId)
+	rows, err := s.pool.Query(ctx, query, userId)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при выполнении запроса состояния пользователя: %w", err)
 	}
@@ -173,7 +173,7 @@ func (s *PostgresStore) GetState(userId int64) ([]model.UserItem, error) {
 }
 
 // GetState retrieves the user state based on the userId.
-func (s *PostgresStore) CreateUser() (int64, error) {
+func (s *PostgresStore) CreateUser(ctx context.Context) (int64, error) { // TODO context
 	query := `
         INSERT INTO users (created_at)
         VALUES (NOW())
@@ -181,12 +181,78 @@ func (s *PostgresStore) CreateUser() (int64, error) {
     `
 	var userID int64
 
-	err := s.pool.QueryRow(context.Background(), query).Scan(&userID)
+	err := s.pool.QueryRow(ctx, query).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
 
 	return userID, nil
+}
+
+// chage userfiles state and delete queue row
+func (s *PostgresStore) FinishTasks(ctx context.Context, tasks []int64) error {
+	return nil
+}
+
+func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(items []model.OutboxItem) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	rows, err := tx.Query(ctx, `
+        SELECT id, payload, idempotency_key
+        FROM outbox
+        WHERE status = 'PENDING'
+        ORDER BY created_at
+        LIMIT 100
+        FOR UPDATE SKIP LOCKED`)
+	if err != nil {
+		tx.Rollback(ctx)
+		return err
+	}
+	defer rows.Close()
+
+	var items []model.OutboxItem
+	var ids []int
+
+	for rows.Next() {
+		var id int
+		var payload string
+		var idempotencyKey string
+
+		if err := rows.Scan(&id, &payload, &idempotencyKey); err != nil {
+			tx.Rollback(ctx)
+			return err
+		}
+
+		item := model.OutboxItem{Payload: payload, IdKey: idempotencyKey}
+		items = append(items, item)
+		ids = append(ids, id)
+	}
+
+	if len(items) > 0 {
+		sendFunc(items)
+		updateQuery := `
+		UPDATE outbox
+		SET status = 'SENT', processed_at = NOW()
+		WHERE id = ANY($1)`
+		_, err = tx.Exec(ctx, updateQuery, pq.Array(ids))
+		if err != nil {
+			tx.Rollback(ctx)
+			return err
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return err
+		} else {
+			return err
+		}
+	} else {
+		tx.Rollback(ctx)
+	}
+
+	return nil
 }
 
 // Close closes the connection pool.

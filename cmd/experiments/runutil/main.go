@@ -12,7 +12,7 @@ import (
 func runExternalUtilityAsync(inputFile, outputFile string) error {
 	dir := "../../utils/realesrgan-ncnn-vulkan-20220424-ubuntu/"
 	cmd := exec.Command(dir+"realesrgan-ncnn-vulkan", "-i", dir+inputFile,
-		"-o", dir+outputFile, "-j 1:1:1")
+		"-o", dir+outputFile)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

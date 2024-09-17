@@ -49,7 +49,7 @@ func (h *FrontHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Reques
 		tasks = append(tasks, task)
 	}
 
-	err = h.store.CreateTasks(tasks)
+	err = h.store.CreateTasks(r.Context(), tasks)
 	if err != nil {
 		h.log.Error("store.CreateTasks", "error", err)
 		http.Error(w, "store.CreateTasks", http.StatusInternalServerError)
@@ -99,7 +99,7 @@ func (h *FrontHandler) GetState(w http.ResponseWriter, r *http.Request) {
 	}
 	h.log.Info("GetUserID", "userID", userID)
 
-	items, err := h.store.GetState(userID)
+	items, err := h.store.GetState(r.Context(), userID)
 	if err != nil {
 		h.log.Error("store.GetState", "error", err)
 		http.Error(w, "store.GetState", http.StatusInternalServerError)
