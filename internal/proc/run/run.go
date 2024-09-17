@@ -29,10 +29,16 @@ func Run(cfg *config.Config) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	fproc := fileprocessor.NewFileProcessor("")
 	idcheck := idcheck.NewIdCheckService(cfg.RedisAddr, 24*time.Hour)
-	producer := producer.NewProducer()
+	producer, err := producer.NewProducer([]string{cfg.KafkaAddr}, cfg.KafkaTopicResult)
+	if err != nil {
+		return err
+	}
 
 	proc := processor.New(wp, s3, log, fproc, idcheck, producer)
-	_ = consumer.NewConsumer(proc)
+	_, err = consumer.NewConsumer([]string{cfg.KafkaAddr}, cfg.KafkaTopic, cfg.KafkeCunsumerGroup, proc)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
