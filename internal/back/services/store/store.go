@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
+	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 )
 
 type Store interface {
@@ -16,7 +17,7 @@ type Store interface {
 	CreateUser(ctx context.Context) (int64, error)
 
 	// chage userfiles state and delete queue row
-	FinishTasks(ctx context.Context, ids []int64) error
+	FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error
 
 	SendTasksToBroker(ctx context.Context, sendFunc func(items []model.OutboxItem) error) error
 

@@ -251,8 +251,54 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
 	return nil
 }
 
-// chage userfiles state and delete queue row
-func (s *PostgresStore) FinishTasks(ctx context.Context, tasks []int64) error {
+// FinishTasks обновляет состояние userfiles и удаляет соответствующую строку из queue.
+func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		} else {
+			err = tx.Commit(ctx)
+		}
+	}()
+
+	for _, msg := range msgs {
+		var queueID int
+
+		getQueueIDStmt := `
+            SELECT queue_id
+            FROM userfiles
+            WHERE id = $1
+        `
+		err = tx.QueryRow(ctx, getQueueIDStmt, msg.TaskId).Scan(&queueID)
+		if err != nil {
+			return fmt.Errorf("ошибка при получении queue_id: %w", err)
+		}
+
+		updateUserFilesStmt := `
+            UPDATE userfiles
+            SET state = $1, queue_id = NULL
+            WHERE id = $2
+        `
+		_, err = tx.Exec(ctx, updateUserFilesStmt, msg.Result, msg.TaskId)
+		if err != nil {
+			return fmt.Errorf("ошибка при обновлении userfiles: %w", err)
+		}
+
+		// Удаляем строку из таблицы queue, используя queue_id
+		deleteQueueStmt := `
+            DELETE FROM queue
+            WHERE id = $1
+        `
+		_, err = tx.Exec(ctx, deleteQueueStmt, queueID)
+		if err != nil {
+			return fmt.Errorf("ошибка при удалении из queue: %w", err)
+		}
+	}
+
 	return nil
 }
 

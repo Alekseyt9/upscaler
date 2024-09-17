@@ -1,12 +1,12 @@
 package messagebroker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
+	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/IBM/sarama"
 )
@@ -19,30 +19,23 @@ type ConsumerService struct {
 }
 
 // NewConsumer создает новый экземпляр ConsumerService
-func NewConsumer(brokers []string, topic, group string) (*ConsumerService, error) {
+func NewConsumer(brokers []string, topic, group string, us *userserv.UserService) (*ConsumerService, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Version = sarama.V2_6_0_0
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, group, config)
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка создания группы потребителей: %v", err)
+		return nil, fmt.Errorf("oшибка создания группы потребителей: %w", err)
 	}
 
-	return &ConsumerService{
+	handler := ConsumerGroupHandler{us: us}
+	cs := &ConsumerService{
 		consumerGroup: consumerGroup,
 		brokers:       brokers,
 		topic:         topic,
 		group:         group,
-	}, nil
-}
-
-// Start запускает консьюмера и начинает обработку сообщений
-func (cs *ConsumerService) Start() {
-	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, os.Interrupt)
-
-	handler := ConsumerGroupHandler{}
+	}
 
 	go func() {
 		for {
@@ -52,14 +45,17 @@ func (cs *ConsumerService) Start() {
 		}
 	}()
 
-	log.Println("Консьюмер запущен. Чтение сообщений из Kafka...")
-	<-sigchan
-	log.Println("Получен сигнал остановки. Завершение работы...")
+	return cs, nil
+}
+
+func (cs *ConsumerService) Close() {
 	cs.consumerGroup.Close()
 }
 
 // ConsumerGroupHandler реализует интерфейс sarama.ConsumerGroupHandler
-type ConsumerGroupHandler struct{}
+type ConsumerGroupHandler struct {
+	us *userserv.UserService
+}
 
 // Setup вызывается перед началом потребления
 func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
@@ -73,20 +69,28 @@ func (h *ConsumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
 
 // ConsumeClaim вызывается для каждого утверждения (claim) в группе
 func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+
+	var msgs []cmodel.BrokerMessageResult
+
 	for message := range claim.Messages() {
-		// Десериализация сообщения в структуру BrokerMessageResult
 		var result cmodel.BrokerMessageResult
 		err := json.Unmarshal(message.Value, &result)
 		if err != nil {
 			log.Printf("Ошибка десериализации сообщения: %v", err)
 			continue
 		}
-
-		// Обработка десериализованного сообщения
 		fmt.Printf("Получено сообщение: TaskId=%d, Result=%s, Error=%s\n", result.TaskId, result.Result, result.Error)
+		msgs = append(msgs, result)
+	}
 
-		// Маркируем сообщение как прочитанное
+	err := h.us.FinishTasks(context.Background(), msgs)
+	if err != nil {
+		return fmt.Errorf("us.FinishTasks %w", err)
+	}
+
+	for message := range claim.Messages() {
 		session.MarkMessage(message, "")
 	}
+
 	return nil
 }

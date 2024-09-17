@@ -15,6 +15,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 )
 
@@ -26,7 +27,16 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 
-	httpRouter, err := Router(cfg, log, store)
+	s3, err := s3store.New(s3store.S3Options{
+		AccessKeyID:     cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey,
+		BucketName:      cfg.S3BucketName,
+	})
+	if err != nil {
+		return err
+	}
+
+	httpRouter, err := Router(cfg, log, store, s3)
 	if err != nil {
 		return err
 	}
@@ -69,11 +79,11 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger, store store.Store) (http.Handler, error) {
+func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	err := setupHandlers(mux, cfg, log, store)
+	err := setupHandlers(mux, cfg, log, store, s3)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +98,7 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 	return handler
 }
 
-func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store) error {
+func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
@@ -101,7 +111,9 @@ func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, sto
 	ho := handler.HandlerOptions{
 		JWTSecret: cfg.JWTSecret,
 	}
-	h := handler.New(s3, log, store, ho)
+	us := userserv.New(store, s3)
+
+	h := handler.New(s3, log, store, ho, us)
 	mux.HandleFunc("/api/user/getuploadurls", h.GetUploadURLs)
 	mux.HandleFunc("/api/user/completefilesupload", h.CompleteFilesUpload)
 	mux.HandleFunc("/api/user/getstate", h.GetState)
