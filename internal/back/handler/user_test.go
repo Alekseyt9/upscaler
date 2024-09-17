@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
-	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
+	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

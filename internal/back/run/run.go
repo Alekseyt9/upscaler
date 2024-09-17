@@ -14,8 +14,8 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/handler"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
-	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 )
 
 func Run(cfg *config.Config) error {

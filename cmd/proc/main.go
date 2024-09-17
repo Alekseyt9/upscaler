@@ -15,6 +15,6 @@ func main() {
 
 	err = run.Run(cfg)
 	if err != nil {
-		log.Println("server startup error: " + err.Error())
+		log.Println("startup error: " + err.Error())
 	}
 }

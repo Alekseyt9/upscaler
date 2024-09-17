@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
+	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -101,7 +102,7 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 			return err
 		}
 
-		payload := model.BrokerMessage{
+		payload := cmodel.BrokerMessage{
 			SrcFileURL:  task.SrcFileURL,
 			DestFileURL: task.DestFileURL,
 			TaskId:      fileId,
@@ -173,7 +174,7 @@ func (s *PostgresStore) GetState(ctx context.Context, userId int64) ([]model.Use
 }
 
 // GetState retrieves the user state based on the userId.
-func (s *PostgresStore) CreateUser(ctx context.Context) (int64, error) { // TODO context
+func (s *PostgresStore) CreateUser(ctx context.Context) (int64, error) {
 	query := `
         INSERT INTO users (created_at)
         VALUES (NOW())
@@ -187,11 +188,6 @@ func (s *PostgresStore) CreateUser(ctx context.Context) (int64, error) { // TODO
 	}
 
 	return userID, nil
-}
-
-// chage userfiles state and delete queue row
-func (s *PostgresStore) FinishTasks(ctx context.Context, tasks []int64) error {
-	return nil
 }
 
 func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(items []model.OutboxItem) error) error {
@@ -252,6 +248,11 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
 		tx.Rollback(ctx)
 	}
 
+	return nil
+}
+
+// chage userfiles state and delete queue row
+func (s *PostgresStore) FinishTasks(ctx context.Context, tasks []int64) error {
 	return nil
 }
 

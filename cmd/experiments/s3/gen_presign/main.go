@@ -11,7 +11,7 @@ import (
 	smithyendpoints "github.com/aws/smithy-go/endpoints"
 
 	cfg "github.com/Alekseyt9/upscaler/internal/back/config"
-	"github.com/Alekseyt9/upscaler/internal/back/services/s3store"
+	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 )
 
 type CustomS3EndpointResolverV2 struct{}
