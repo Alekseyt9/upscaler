@@ -5,6 +5,7 @@ import (
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	"github.com/Alekseyt9/upscaler/internal/back/services/websocket"
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 	"golang.org/x/net/context"
@@ -13,12 +14,14 @@ import (
 type UserService struct {
 	store   store.Store
 	s3store s3store.S3Store
+	ws      *websocket.WebSocketService
 }
 
-func New(store store.Store, s3store s3store.S3Store) *UserService {
+func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketService) *UserService {
 	return &UserService{
 		store:   store,
 		s3store: s3store,
+		ws:      ws,
 	}
 }
 
@@ -59,7 +62,6 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 }
 
 func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
-
 	var tasks []model.FinishedTask
 
 	for _, m := range msgs {
@@ -80,5 +82,13 @@ func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessa
 	if err != nil {
 		return fmt.Errorf("store.FinishTasks %w", err)
 	}
+
+	for _, m := range msgs {
+		err = u.ws.Send(m.UserID, "update")
+		if err != nil {
+			return fmt.Errorf("userserv FinishTasks ws.Send %w", err)
+		}
+	}
+
 	return nil
 }

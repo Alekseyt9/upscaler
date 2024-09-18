@@ -1,25 +1,29 @@
 document.addEventListener('DOMContentLoaded', () => {
     const baseUrl = window.location.origin;
-    const loginUrl = `${baseUrl}/api/auth/login`;
+    const loginUrl = `${baseUrl}/api/auth/login2`;
+    const socket = new WebSocket(loginUrl);
 
-    fetch(loginUrl, {
-        method: 'POST', 
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}), 
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Ошибка при авторизации: ${response.statusText}`);
-        }
-        console.log('Авторизация успешна');
+    socket.onopen = () => {
+        console.log('Соединение с WebSocket установлено');
         loadTableData();
-    })
-    .catch(error => {
-        console.error('Ошибка при авторизации:', error);
-    });
+    };
+
+    socket.onmessage = (event) => {
+        const message = event.data;
+        console.log('Получено сообщение:', message);
+
+        if (message === 'update') {
+            loadTableData();
+        }
+    };
+
+    socket.onerror = (error) => {
+        console.error('Ошибка WebSocket:', error);
+    };
+
+    socket.onclose = () => {
+        console.log('WebSocket соединение закрыто');
+    };
 });
 
 function loadTableData() {
@@ -45,6 +49,8 @@ function createTableRows(data) {
     if (!data){
         return;
     }
+
+    data.reverse();
 
     data.forEach(item => {
         const row = document.createElement('tr');

@@ -74,7 +74,11 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 			Result:      resMsg,
 			Error:       errMsg,
 			DestFileKey: msg.DestFileKey,
+			UserID:      msg.UserID,
 		}
+
+		p.log.Info("sended msg", "message", rmsg)
+
 		err = p.producer.Send(rmsg)
 		if err != nil {
 			p.log.Error("broker.Send", "error", err)

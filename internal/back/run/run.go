@@ -18,6 +18,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/services/messagebroker"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
+	"github.com/Alekseyt9/upscaler/internal/back/services/websocket"
 	"github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 )
@@ -37,7 +38,8 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 		return fmt.Errorf("s3store.New %w", err)
 	}
 
-	us := userserv.New(store, s3)
+	ws := websocket.New(log)
+	us := userserv.New(store, s3, ws)
 	consumer, err := messagebroker.NewConsumer(us, log, model.BrokerOptions{
 		Topic:         cfg.KafkaTopicResult,
 		KafkaBrokers:  []string{cfg.KafkaAddr},
@@ -53,7 +55,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 		return fmt.Errorf("messagebroker.NewProducer %w", err)
 	}
 
-	httpRouter, err := Router(cfg, log, store, s3, us)
+	httpRouter, err := Router(cfg, log, store, s3, us, ws)
 	if err != nil {
 		return fmt.Errorf("new Router %w", err)
 	}
@@ -99,11 +101,12 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store, us *userserv.UserService) (http.Handler, error) {
+func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store,
+	us *userserv.UserService, ws *websocket.WebSocketService) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	err := setupHandlers(mux, cfg, log, store, s3, us)
+	err := setupHandlers(mux, cfg, log, store, s3, us, ws)
 	if err != nil {
 		return nil, fmt.Errorf("setupHandlers %w", err)
 	}
@@ -119,16 +122,17 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 }
 
 func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store,
-	s3 s3store.S3Store, us *userserv.UserService) error {
+	s3 s3store.S3Store, us *userserv.UserService, ws *websocket.WebSocketService) error {
 	ho := handler.HandlerOptions{
 		JWTSecret: cfg.JWTSecret,
 	}
 
-	h := handler.New(s3, log, store, ho, us)
+	h := handler.New(s3, log, store, ho, us, ws)
 	mux.HandleFunc("/api/user/getuploadurls", h.GetUploadURLs)
 	mux.HandleFunc("/api/user/completefilesupload", h.CompleteFilesUpload)
 	mux.HandleFunc("/api/user/getstate", h.GetState)
 	mux.HandleFunc("/api/auth/login", h.Login)
+	mux.HandleFunc("/api/auth/login2", h.Login2)
 
 	return nil
 }

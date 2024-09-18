@@ -107,6 +107,7 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 			TaskId:        fileID,
 			FileExtension: filepath.Ext(task.FileName),
 			DestFileKey:   task.DestFileKey,
+			UserID:        strconv.FormatInt(task.UserID, 10),
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {

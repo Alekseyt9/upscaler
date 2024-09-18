@@ -6,6 +6,7 @@ type BrokerMessage struct {
 	DestFileKey   string
 	TaskId        int64
 	FileExtension string
+	UserID        string
 }
 
 type BrokerMessageResult struct {
@@ -13,6 +14,7 @@ type BrokerMessageResult struct {
 	Result      string
 	Error       string
 	DestFileKey string
+	UserID      string
 }
 
 type BrokerOptions struct {

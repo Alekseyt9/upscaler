@@ -3,7 +3,10 @@
 package logger
 
 import (
+	"bufio"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 )
@@ -16,17 +19,23 @@ type ResponseWriter interface {
 	WriteHeader(statusCode int)
 }
 
-type (
-	responseData struct {
-		status int
-		size   int
-	}
+type responseData struct {
+	status int
+	size   int
+}
 
-	loggingResponseWriter struct {
-		http.ResponseWriter
-		responseData *responseData
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	responseData *responseData
+}
+
+func (r *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("websocket: response does not implement http.Hijacker")
 	}
-)
+	return hijacker.Hijack()
+}
 
 // Write writes data to the wrapped ResponseWriter and updates the size tracked in responseData.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
