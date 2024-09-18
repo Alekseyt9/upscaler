@@ -43,7 +43,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 
 	proc := processor.New(wp, s3, log, fproc, idcheck, producer)
 	cons, err := consumer.NewConsumer(proc, log, model.BrokerOptions{
-		Topic:         cfg.KafkaTopicResult,
+		Topic:         cfg.KafkaTopic,
 		KafkaBrokers:  []string{cfg.KafkaAddr},
 		ConsumerGroup: cfg.KafkeCunsumerGroup,
 	})
@@ -57,8 +57,8 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 	<-stop
 	log.Info("Shutting down gracefully...")
 
-	producer.Close()
 	cons.Close()
+	producer.Close()
 
 	return nil
 }

@@ -17,6 +17,8 @@ type Consumer struct {
 	topic         string
 	group         string
 	log           *slog.Logger
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 // ConsumerGroupHandler реализует интерфейс sarama.ConsumerGroupHandler
@@ -41,19 +43,27 @@ func NewConsumer(us *userserv.UserService, log *slog.Logger, opt cmodel.BrokerOp
 		log: log,
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	cs := &Consumer{
 		consumerGroup: consumerGroup,
 		brokers:       opt.KafkaBrokers,
 		topic:         opt.Topic,
 		group:         opt.ConsumerGroup,
 		log:           log,
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
 	go func() {
-		ctx := context.Background()
 		for {
-			if err := cs.consumerGroup.Consume(ctx, []string{cs.topic}, &handler); err != nil {
-				log.Error("Ошибка при обработке сообщений", "error", err)
+			select {
+			case <-cs.ctx.Done():
+				return
+			default:
+				if err := cs.consumerGroup.Consume(cs.ctx, []string{cs.topic}, &handler); err != nil {
+					log.Error("consumerGroup.Consume Ошибка при обработке сообщений", "error", err)
+				}
 			}
 		}
 	}()
@@ -62,7 +72,11 @@ func NewConsumer(us *userserv.UserService, log *slog.Logger, opt cmodel.BrokerOp
 }
 
 func (cs *Consumer) Close() {
-	cs.consumerGroup.Close()
+	cs.cancel()
+
+	if err := cs.consumerGroup.Close(); err != nil {
+		cs.log.Error("Ошибка при закрытии consumer group", "error", err)
+	}
 }
 
 // Setup вызывается перед началом потребления

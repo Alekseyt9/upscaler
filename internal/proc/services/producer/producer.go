@@ -1,6 +1,8 @@
 package producer
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/Alekseyt9/upscaler/internal/common/model"
@@ -34,12 +36,17 @@ func NewProducer(log *slog.Logger, opt cmodel.BrokerOptions) (*Producer, error) 
 
 // Send отправляет одно сообщение в Kafka топик.
 func (p *Producer) Send(msg model.BrokerMessageResult) error {
-	message := &sarama.ProducerMessage{
-		Topic: p.topic,
-		Value: sarama.StringEncoder(msg.Result),
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("producer Send ошибка сериализации сообщения: %w", err)
 	}
 
-	_, _, err := p.producer.SendMessage(message)
+	message := &sarama.ProducerMessage{
+		Topic: p.topic,
+		Value: sarama.ByteEncoder(msgBytes),
+	}
+
+	_, _, err = p.producer.SendMessage(message)
 	if err != nil {
 		p.log.Error("producer Send Ошибка при отправке сообщения в Kafka", "error", err)
 		return err
