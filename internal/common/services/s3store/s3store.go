@@ -17,6 +17,7 @@ import (
 
 type S3Store interface {
 	GetPresigned(count int) ([]Link, error)
+	GetPresignedLoad(key string) (string, error)
 	DownloadAndSaveTemp(url string) (string, error)
 	Upload(url string, path string) error
 }
@@ -86,7 +87,7 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 		}, s3.WithPresignExpires(time.Hour*24*30))
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("presignClient.PresignPutObject %w", err)
 		}
 
 		objects = append(objects, Link{
@@ -96,6 +97,27 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	}
 
 	return objects, nil
+}
+
+func (s *YOStorage) GetPresignedLoad(key string) (string, error) {
+	presignClient := s3.NewPresignClient(s.client)
+	req, err := presignClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.opts.BucketName),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("presignClient.PresignGetObject %w", err)
+	}
+
+	/*
+		urlStr, err := req.Presign(15 * time.Minute)
+		if err != nil {
+			return "", fmt.Errorf("ошибка генерации presigned URL: %w", err)
+		}
+	*/
+
+	return req.URL, nil
 }
 
 func (s *YOStorage) DownloadAndSaveTemp(url string) (string, error) {

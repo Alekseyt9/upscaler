@@ -264,8 +264,6 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMes
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback(ctx)
-		} else {
-			err = tx.Commit(ctx)
 		}
 	}()
 
@@ -301,6 +299,11 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMes
 		if err != nil {
 			return fmt.Errorf("ошибка при удалении из queue: %w", err)
 		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("tx.Commit %w", err)
 	}
 
 	return nil

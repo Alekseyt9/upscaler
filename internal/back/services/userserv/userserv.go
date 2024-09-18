@@ -33,9 +33,15 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 		fileInfo := fileInfos[i]
 		dlink := dlinks[i]
 
+		// need to generate URL for downloading
+		dURL, err := u.s3store.GetPresignedLoad(fileInfo.Key)
+		if err != nil {
+			return fmt.Errorf("s3store.GetPresignedLoad %w", err)
+		}
+
 		task := model.StoreTask{
 			UserID:      userID,
-			SrcFileURL:  fileInfo.Url,
+			SrcFileURL:  dURL,
 			SrcFileKey:  fileInfo.Key,
 			DestFileURL: dlink.Url,
 			DestFileKey: dlink.Key,

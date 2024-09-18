@@ -45,6 +45,7 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 		if err != nil {
 			p.log.Error("s3store.DownloadAndSaveTemp", "error", err)
 		}
+		p.log.Info("processor Process", "tempfile", path)
 
 		outpath := path + ".out"
 		if err == nil {
@@ -61,10 +62,10 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 			}
 		}
 
-		resMsg := "ok"
+		resMsg := "OK"
 		errMsg := ""
 		if err != nil {
-			resMsg = "error"
+			resMsg = "ERROR"
 			errMsg = err.Error()
 		}
 

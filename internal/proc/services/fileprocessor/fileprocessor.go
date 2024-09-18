@@ -1,8 +1,8 @@
 package fileprocessor
 
 import (
+	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 )
@@ -24,12 +24,19 @@ func (fp *FileProcessor) Process(inputFile, outputFile string) error {
 	inputPath := filepath.Join(fp.utilityDir, inputFile)
 	outputPath := filepath.Join(fp.utilityDir, outputFile)
 
-	cmd := exec.Command(filepath.Join(fp.utilityDir, "realesrgan-ncnn-vulkan"), "-i", inputPath, "-o", outputPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	path := filepath.Join(fp.utilityDir, "realesrgan-ncnn-vulkan")
+	cmd := exec.Command(path, "-i", inputPath, "-o", outputPath)
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run external utility: %w", err)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
+	stdoutStr := stdoutBuf.String()
+	stderrStr := stderrBuf.String()
+
+	if err != nil {
+		return fmt.Errorf("failed to run external utility: %w %s %s", err, stdoutStr, stderrStr)
 	}
 
 	return nil
