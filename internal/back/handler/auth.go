@@ -56,11 +56,11 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // GET
 func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
-	var userID int64
+	var cookie *http.Cookie
 
 	cookie, err := r.Cookie("jwt")
 	if err != nil || cookie.Value == "" {
-		userID, err = h.createUserAndSetToken(w, r)
+		cookie, err = h.createUserAndSetToken(w, r)
 		if err != nil {
 			h.log.Error("h.createUserAndSetToken", "error", err)
 			http.Error(w, "h.createUserAndSetToken", http.StatusInternalServerError)
@@ -72,7 +72,7 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 		return []byte(h.opt.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		userID, err = h.createUserAndSetToken(w, r)
+		cookie, err = h.createUserAndSetToken(w, r)
 		if err != nil {
 			h.log.Error("h.createUserAndSetToken", "error", err)
 			http.Error(w, "h.createUserAndSetToken", http.StatusInternalServerError)
@@ -80,19 +80,13 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var userID int64
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		userIDStr := claims["userId"].(string)
 		userID, err = strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			h.log.Error("Ошибка при парсинге userId", "error", err)
 			http.Error(w, "Ошибка при парсинге userId", http.StatusInternalServerError)
-			return
-		}
-	} else {
-		userID, err = h.createUserAndSetToken(w, r)
-		if err != nil {
-			h.log.Error("h.createUserAndSetToken", "error", err)
-			http.Error(w, "h.createUserAndSetToken", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -102,7 +96,11 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 			return true
 		},
 	}
-	conn, err := upgrader.Upgrade(w, r, nil)
+
+	responseHeader := http.Header{}
+	responseHeader.Add("Set-Cookie", cookie.String())
+
+	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
 		h.log.Error("Ошибка при установлении WebSocket соединения", "error", err)
 		http.Error(w, "Ошибка при установлении WebSocket соединения", http.StatusInternalServerError)
@@ -127,10 +125,10 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 	h.log.Info("Клиент отключен", "address", r.RemoteAddr)
 }
 
-func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) (int64, error) {
+func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) (*http.Cookie, error) {
 	id, err := h.store.CreateUser(r.Context())
 	if err != nil {
-		return 0, fmt.Errorf("store.CreateUser %w", err)
+		return nil, fmt.Errorf("store.CreateUser %w", err)
 	}
 
 	userId := strconv.FormatInt(id, 10)
@@ -141,16 +139,17 @@ func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Requ
 
 	tokenString, err := token.SignedString([]byte(h.opt.JWTSecret))
 	if err != nil {
-		return 0, fmt.Errorf("oшибка генерации токена %w", err)
+		return nil, fmt.Errorf("oшибка генерации токена %w", err)
 	}
 
-	http.SetCookie(w, &http.Cookie{
+	c := &http.Cookie{
 		Name:     "jwt",
 		Value:    tokenString,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
 		Path:     "/",
-	})
+	}
+	http.SetCookie(w, c)
 
-	return id, nil
+	return c, nil
 }

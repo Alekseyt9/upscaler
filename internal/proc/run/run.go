@@ -30,7 +30,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 	}
 
 	wp := workerpool.New(1) // there is no point in running upscale in parallel
-	fproc := fileprocessor.NewFileProcessor("util/")
+	fproc := fileprocessor.NewFileProcessor("util/", log)
 	idcheck := idcheck.NewIdCheckService(cfg.RedisAddr, 24*time.Hour)
 
 	producer, err := producer.NewProducer(log, model.BrokerOptions{
