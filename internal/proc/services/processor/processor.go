@@ -70,9 +70,10 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 		}
 
 		rmsg := model.BrokerMessageResult{
-			TaskId: msg.TaskId,
-			Result: resMsg,
-			Error:  errMsg,
+			TaskId:      msg.TaskId,
+			Result:      resMsg,
+			Error:       errMsg,
+			DestFileKey: msg.DestFileKey,
 		}
 		err = p.producer.Send(rmsg)
 		if err != nil {

@@ -9,6 +9,13 @@ type StoreTask struct {
 	DestFileKey string // Key of the destination file
 }
 
+type FinishedTask struct {
+	TaskId      int64
+	Result      string
+	Error       string
+	DestFileURL string
+}
+
 type UploadedFile struct {
 	Url  string
 	Key  string

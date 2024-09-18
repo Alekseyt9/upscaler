@@ -103,9 +103,11 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 
 		h.log.Info("consumer ConsumeClaim", "message", result)
 
-		err = h.us.FinishTasks(context.Background(), []cmodel.BrokerMessageResult{result})
-		if err != nil {
-			return fmt.Errorf("consumer ConsumeClaim us.FinishTasks %w", err)
+		if result.DestFileKey != "" {
+			err = h.us.FinishTasks(context.Background(), []cmodel.BrokerMessageResult{result})
+			if err != nil {
+				return fmt.Errorf("consumer ConsumeClaim us.FinishTasks %w", err)
+			}
 		}
 		session.MarkMessage(message, "")
 	}

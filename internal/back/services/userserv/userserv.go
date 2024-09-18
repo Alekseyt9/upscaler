@@ -59,7 +59,24 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 }
 
 func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
-	err := u.store.FinishTasks(ctx, msgs)
+
+	var tasks []model.FinishedTask
+
+	for _, m := range msgs {
+		url, err := u.s3store.GetPresignedLoad(m.DestFileKey)
+		if err != nil {
+			return fmt.Errorf("UserService.FinishTasks s3store.GetPresignedLoad %w", err)
+		}
+
+		tasks = append(tasks, model.FinishedTask{
+			TaskId:      m.TaskId,
+			Result:      m.Result,
+			Error:       m.Error,
+			DestFileURL: url,
+		})
+	}
+
+	err := u.store.FinishTasks(ctx, tasks)
 	if err != nil {
 		return fmt.Errorf("store.FinishTasks %w", err)
 	}

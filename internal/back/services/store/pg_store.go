@@ -106,6 +106,7 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 			DestFileURL:   task.DestFileURL,
 			TaskId:        fileID,
 			FileExtension: filepath.Ext(task.FileName),
+			DestFileKey:   task.DestFileKey,
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {
@@ -257,7 +258,7 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
 }
 
 // FinishTasks обновляет состояние userfiles и удаляет соответствующую строку из queue.
-func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
+func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []model.FinishedTask) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -283,10 +284,10 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMes
 
 		updateUserFilesStmt := `
             UPDATE userfiles
-            SET state = $1, queue_id = NULL
+            SET state = $1, queue_id = NULL, dest_file_url = $3
             WHERE id = $2
         `
-		_, err = tx.Exec(ctx, updateUserFilesStmt, msg.Result, msg.TaskId)
+		_, err = tx.Exec(ctx, updateUserFilesStmt, msg.Result, msg.TaskId, msg.DestFileURL)
 		if err != nil {
 			return fmt.Errorf("ошибка при обновлении userfiles: %w", err)
 		}
