@@ -41,13 +41,13 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 	}
 
 	p.wpool.AddTask(func() {
-		path, err := p.s3store.DownloadAndSaveTemp(msg.SrcFileURL)
+		path, err := p.s3store.DownloadAndSaveTemp(msg.SrcFileURL, msg.FileExtension)
 		if err != nil {
 			p.log.Error("s3store.DownloadAndSaveTemp", "error", err)
 		}
 		p.log.Info("processor Process", "tempfile", path)
 
-		outpath := path + ".out"
+		outpath := path + ".out" + msg.FileExtension
 		if err == nil {
 			err = p.fileproc.Process(path, outpath)
 			if err != nil {
@@ -62,7 +62,7 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 			}
 		}
 
-		resMsg := "OK"
+		resMsg := "PROCESSED"
 		errMsg := ""
 		if err != nil {
 			resMsg = "ERROR"

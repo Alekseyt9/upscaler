@@ -91,9 +91,6 @@ func (h *ConsumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
 
 // ConsumeClaim вызывается для каждого утверждения (claim) в группе
 func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-
-	var msgs []cmodel.BrokerMessageResult
-
 	for message := range claim.Messages() {
 		var result cmodel.BrokerMessageResult
 		err := json.Unmarshal(message.Value, &result)
@@ -103,17 +100,13 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 		}
 		h.log.Info("consumer ConsumeClaim Получено сообщение",
 			"TaskId", result.TaskId, "Result", result.Result, "Error", result.Error)
-		msgs = append(msgs, result)
-	}
 
-	h.log.Info("consumer ConsumeClaim", "messages", msgs)
+		h.log.Info("consumer ConsumeClaim", "message", result)
 
-	err := h.us.FinishTasks(context.Background(), msgs)
-	if err != nil {
-		return fmt.Errorf("consumer ConsumeClaim us.FinishTasks %w", err)
-	}
-
-	for message := range claim.Messages() {
+		err = h.us.FinishTasks(context.Background(), []cmodel.BrokerMessageResult{result})
+		if err != nil {
+			return fmt.Errorf("consumer ConsumeClaim us.FinishTasks %w", err)
+		}
 		session.MarkMessage(message, "")
 	}
 

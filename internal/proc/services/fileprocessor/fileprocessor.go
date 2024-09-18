@@ -21,8 +21,8 @@ func NewFileProcessor(utilityDir string) *FileProcessor {
 
 // Process запускает внешнюю утилиту синхронно и ожидает завершения
 func (fp *FileProcessor) Process(inputFile, outputFile string) error {
-	inputPath := filepath.Join(fp.utilityDir, inputFile)
-	outputPath := filepath.Join(fp.utilityDir, outputFile)
+	inputPath := inputFile
+	outputPath := outputFile
 
 	path := filepath.Join(fp.utilityDir, "realesrgan-ncnn-vulkan")
 	cmd := exec.Command(path, "-i", inputPath, "-o", outputPath)

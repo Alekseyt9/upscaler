@@ -18,7 +18,7 @@ import (
 type S3Store interface {
 	GetPresigned(count int) ([]Link, error)
 	GetPresignedLoad(key string) (string, error)
-	DownloadAndSaveTemp(url string) (string, error)
+	DownloadAndSaveTemp(url string, ext string) (string, error)
 	Upload(url string, path string) error
 }
 
@@ -120,14 +120,14 @@ func (s *YOStorage) GetPresignedLoad(key string) (string, error) {
 	return req.URL, nil
 }
 
-func (s *YOStorage) DownloadAndSaveTemp(url string) (string, error) {
+func (s *YOStorage) DownloadAndSaveTemp(url string, ext string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("ошибка при скачивании файла: %w", err)
 	}
 	defer resp.Body.Close()
 
-	tempFile, err := os.CreateTemp("", "downloaded-*.tmp")
+	tempFile, err := os.CreateTemp("", "downloaded-*"+ext)
 	if err != nil {
 		return "", fmt.Errorf("ошибка создания временного файла: %w", err)
 	}

@@ -102,9 +102,10 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 		}
 
 		payload := cmodel.BrokerMessage{
-			SrcFileURL:  task.SrcFileURL,
-			DestFileURL: task.DestFileURL,
-			TaskId:      fileID,
+			SrcFileURL:    task.SrcFileURL,
+			DestFileURL:   task.DestFileURL,
+			TaskId:        fileID,
+			FileExtension: filepath.Ext(task.FileName),
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {

@@ -1,9 +1,10 @@
 package model
 
 type BrokerMessage struct {
-	SrcFileURL  string
-	DestFileURL string
-	TaskId      int64
+	SrcFileURL    string
+	DestFileURL   string
+	TaskId        int64
+	FileExtension string
 }
 
 type BrokerMessageResult struct {
