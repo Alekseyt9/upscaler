@@ -25,10 +25,11 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 
-	wp := workerpool.New(1) // features of running the utility for upscale, there is no point in running it in parallel
+	wp := workerpool.New(1) // there is no point in running upscale in parallel
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	fproc := fileprocessor.NewFileProcessor("")
 	idcheck := idcheck.NewIdCheckService(cfg.RedisAddr, 24*time.Hour)
+
 	producer, err := producer.NewProducer([]string{cfg.KafkaAddr}, cfg.KafkaTopicResult)
 	if err != nil {
 		return err

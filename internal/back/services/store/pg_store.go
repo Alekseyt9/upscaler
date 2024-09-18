@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
@@ -70,19 +71,17 @@ func getMigrationPath() string {
 func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("pool.Begin %w", err)
 	}
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback(ctx)
-		} else {
-			err = tx.Commit(ctx)
 		}
 	}()
 
 	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
 	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, file_name, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
-						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	insertOutboxStmt := `INSERT INTO outbox (payload, status, idempotency_key) 
 						 VALUES ($1, 'PENDING', $2)`
 
@@ -90,32 +89,37 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 		var queueID int
 		err = tx.QueryRow(ctx, insertQueueStmt).Scan(&queueID)
 		if err != nil {
-			return err
+			return fmt.Errorf("tx.QueryRow insertQueueStmt %w", err)
 		}
 
-		var fileId int64
+		var fileID int64
 		err = tx.QueryRow(ctx,
 			insertUserFileStmt,
 			queueID, task.UserID, task.FileName, task.SrcFileURL, task.SrcFileKey, task.DestFileURL,
-			task.DestFileKey, "PENDING").Scan(&fileId)
+			task.DestFileKey, "PENDING").Scan(&fileID)
 		if err != nil {
-			return err
+			return fmt.Errorf("tx.QueryRow insertUserFileStmt %w", err)
 		}
 
 		payload := cmodel.BrokerMessage{
 			SrcFileURL:  task.SrcFileURL,
 			DestFileURL: task.DestFileURL,
-			TaskId:      fileId,
+			TaskId:      fileID,
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {
-			return err
+			return fmt.Errorf("json.Marshal %w", err)
 		}
 
-		_, err = tx.Exec(ctx, insertOutboxStmt, plJson, fileId)
+		_, err = tx.Exec(ctx, insertOutboxStmt, plJson, strconv.FormatInt(fileID, 10))
 		if err != nil {
-			return err
+			return fmt.Errorf("tx.Exec insertOutboxStmt %w", err)
 		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("tx.Commit %w", err)
 	}
 
 	return nil
@@ -193,7 +197,7 @@ func (s *PostgresStore) CreateUser(ctx context.Context) (int64, error) {
 func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(items []model.OutboxItem) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("pool.Begin %w", err)
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -205,7 +209,7 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
         FOR UPDATE SKIP LOCKED`)
 	if err != nil {
 		tx.Rollback(ctx)
-		return err
+		return fmt.Errorf("outbox select query %w", err)
 	}
 	defer rows.Close()
 
@@ -219,7 +223,7 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
 
 		if err := rows.Scan(&id, &payload, &idempotencyKey); err != nil {
 			tx.Rollback(ctx)
-			return err
+			return fmt.Errorf("outbox select query rows.Scan %w", err)
 		}
 
 		item := model.OutboxItem{Payload: payload, IdKey: idempotencyKey}
@@ -236,11 +240,11 @@ func (s *PostgresStore) SendTasksToBroker(ctx context.Context, sendFunc func(ite
 		_, err = tx.Exec(ctx, updateQuery, pq.Array(ids))
 		if err != nil {
 			tx.Rollback(ctx)
-			return err
+			return fmt.Errorf("outbox update query %w", err)
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			return err
+			return fmt.Errorf("tx.Commit %w", err)
 		} else {
 			return err
 		}

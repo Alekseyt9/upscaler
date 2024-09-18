@@ -2,23 +2,24 @@ package messagebroker
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	"github.com/IBM/sarama"
-	_ "github.com/lib/pq"
 )
 
 type Producer struct {
 	store    store.Store
 	producer sarama.SyncProducer
+	topic    string
 	interval time.Duration
 	quit     chan struct{}
 }
 
-func NewProducer(store store.Store, kafkaBrokers []string) (*Producer, error) {
+func NewProducer(store store.Store, kafkaBrokers []string, topic string) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
@@ -32,6 +33,7 @@ func NewProducer(store store.Store, kafkaBrokers []string) (*Producer, error) {
 	sender := &Producer{
 		store:    store,
 		producer: producer,
+		topic:    topic,
 		interval: 3 * time.Second,
 		quit:     make(chan struct{}),
 	}
@@ -50,10 +52,10 @@ func (s *Producer) startSending() {
 		case <-ticker.C:
 			err := s.sendMessagesBatch()
 			if err != nil {
-				log.Println("error", err) // TODO slog
+				log.Println("error", err) // TODO: Use slog for structured logging
 			}
 		case <-s.quit:
-			log.Println("Остановка отправки сообщений")
+			log.Println("Stopping message sending")
 			return
 		}
 	}
@@ -64,7 +66,7 @@ func (s *Producer) sendMessagesBatch() error {
 		var messages []*sarama.ProducerMessage
 		for _, item := range items {
 			msg := &sarama.ProducerMessage{
-				Topic: "file_processing",
+				Topic: s.topic,
 				Key:   sarama.StringEncoder(item.IdKey),
 				Value: sarama.StringEncoder(item.Payload),
 			}
@@ -73,20 +75,20 @@ func (s *Producer) sendMessagesBatch() error {
 
 		err := s.producer.SendMessages(messages)
 		if err != nil {
-			return err
+			return fmt.Errorf("producer.SendMessages %w", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("sendMessagesBatch store.SendTasksToBroker %w", err)
 	}
 
 	return nil
 }
 
-func (s *Producer) Stop() {
+func (s *Producer) Close() {
 	close(s.quit)
 	s.producer.Close()
 }

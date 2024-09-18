@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/handler"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
+	"github.com/Alekseyt9/upscaler/internal/back/services/messagebroker"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
@@ -24,12 +26,32 @@ func Run(cfg *config.Config) error {
 
 	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("store.NewPostgresStore %w", err)
 	}
 
-	httpRouter, err := Router(cfg, log, store)
+	s3, err := s3store.New(s3store.S3Options{
+		AccessKeyID:     cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey,
+		BucketName:      cfg.S3BucketName,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("s3store.New %w", err)
+	}
+
+	us := userserv.New(store, s3)
+	consumer, err := messagebroker.NewConsumer([]string{cfg.KafkaAddr}, cfg.KafkaTopicResult, cfg.KafkeCunsumerGroup, us)
+	if err != nil {
+		return fmt.Errorf("messagebroker.NewConsumer %w", err)
+	}
+
+	producer, err := messagebroker.NewProducer(store, []string{cfg.KafkaAddr}, cfg.KafkaTopic)
+	if err != nil {
+		return fmt.Errorf("messagebroker.NewProducer %w", err)
+	}
+
+	httpRouter, err := Router(cfg, log, store, s3, us)
+	if err != nil {
+		return fmt.Errorf("new Router %w", err)
 	}
 
 	server := &http.Server{
@@ -65,18 +87,21 @@ func Run(cfg *config.Config) error {
 		log.Error("Store shutdown failed", "error", err)
 	}
 
+	consumer.Close()
+	producer.Close()
+
 	log.Info("Server shutdown completed")
 
 	return nil
 }
 
-func Router(cfg *config.Config, log *slog.Logger, store store.Store) (http.Handler, error) {
+func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store, us *userserv.UserService) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
-	err := setupHandlers(mux, cfg, log, store)
+	err := setupHandlers(mux, cfg, log, store, s3, us)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("setupHandlers %w", err)
 	}
 	handler := setupMiddlware(mux, log, cfg)
 
@@ -89,20 +114,11 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 	return handler
 }
 
-func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store) error {
-	s3, err := s3store.New(s3store.S3Options{
-		AccessKeyID:     cfg.S3AccessKeyID,
-		SecretAccessKey: cfg.S3SecretAccessKey,
-		BucketName:      cfg.S3BucketName,
-	})
-	if err != nil {
-		return err
-	}
-
+func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store,
+	s3 s3store.S3Store, us *userserv.UserService) error {
 	ho := handler.HandlerOptions{
 		JWTSecret: cfg.JWTSecret,
 	}
-	us := userserv.New(store, s3)
 
 	h := handler.New(s3, log, store, ho, us)
 	mux.HandleFunc("/api/user/getuploadurls", h.GetUploadURLs)

@@ -11,7 +11,7 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type ConsumerService struct {
+type Consumer struct {
 	consumerGroup sarama.ConsumerGroup
 	brokers       []string
 	topic         string
@@ -19,7 +19,7 @@ type ConsumerService struct {
 }
 
 // NewConsumer создает новый экземпляр ConsumerService
-func NewConsumer(brokers []string, topic, group string, us *userserv.UserService) (*ConsumerService, error) {
+func NewConsumer(brokers []string, topic, group string, us *userserv.UserService) (*Consumer, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Version = sarama.V2_6_0_0
@@ -30,7 +30,7 @@ func NewConsumer(brokers []string, topic, group string, us *userserv.UserService
 	}
 
 	handler := ConsumerGroupHandler{us: us}
-	cs := &ConsumerService{
+	cs := &Consumer{
 		consumerGroup: consumerGroup,
 		brokers:       brokers,
 		topic:         topic,
@@ -38,8 +38,9 @@ func NewConsumer(brokers []string, topic, group string, us *userserv.UserService
 	}
 
 	go func() {
+		ctx := context.Background()
 		for {
-			if err := cs.consumerGroup.Consume(nil, []string{cs.topic}, &handler); err != nil {
+			if err := cs.consumerGroup.Consume(ctx, []string{cs.topic}, &handler); err != nil {
 				log.Fatalf("Ошибка при обработке сообщений: %v", err)
 			}
 		}
@@ -48,7 +49,7 @@ func NewConsumer(brokers []string, topic, group string, us *userserv.UserService
 	return cs, nil
 }
 
-func (cs *ConsumerService) Close() {
+func (cs *Consumer) Close() {
 	cs.consumerGroup.Close()
 }
 

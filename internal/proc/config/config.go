@@ -8,7 +8,7 @@ import (
 type Config struct {
 	RedisAddr          string `env:"REDIS_ADDRESS"`
 	KafkaAddr          string `env:"KAFKA_ADDRESS"`
-	KafkaTopic         string `env:"KAFKA_TOPIC_RESULT"`
+	KafkaTopic         string `env:"KAFKA_TOPIC"`
 	KafkaTopicResult   string `env:"KAFKA_TOPIC_RESULT"`
 	KafkeCunsumerGroup string `env:"KAFKA_CONSUMER_GROUP"`
 	S3AccessKeyID      string `env:"S3_ACCESSKEYID"`
