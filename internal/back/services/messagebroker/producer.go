@@ -3,11 +3,12 @@ package messagebroker
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/IBM/sarama"
 )
 
@@ -17,15 +18,16 @@ type Producer struct {
 	topic    string
 	interval time.Duration
 	quit     chan struct{}
+	log      *slog.Logger
 }
 
-func NewProducer(store store.Store, kafkaBrokers []string, topic string) (*Producer, error) {
+func NewProducer(store store.Store, log *slog.Logger, opt cmodel.BrokerOptions) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 	config.Producer.Flush.Frequency = 500 * time.Millisecond
 
-	producer, err := sarama.NewSyncProducer(kafkaBrokers, config)
+	producer, err := sarama.NewSyncProducer(opt.KafkaBrokers, config)
 	if err != nil {
 		return nil, err
 	}
@@ -33,9 +35,10 @@ func NewProducer(store store.Store, kafkaBrokers []string, topic string) (*Produ
 	sender := &Producer{
 		store:    store,
 		producer: producer,
-		topic:    topic,
+		topic:    opt.Topic,
 		interval: 3 * time.Second,
 		quit:     make(chan struct{}),
+		log:      log,
 	}
 
 	go sender.startSending()
@@ -52,10 +55,10 @@ func (s *Producer) startSending() {
 		case <-ticker.C:
 			err := s.sendMessagesBatch()
 			if err != nil {
-				log.Println("error", err) // TODO: Use slog for structured logging
+				s.log.Error("sendMessagesBatch", "error", err)
 			}
 		case <-s.quit:
-			log.Println("Stopping message sending")
+			s.log.Info("producer Stopping message sending")
 			return
 		}
 	}
@@ -77,6 +80,7 @@ func (s *Producer) sendMessagesBatch() error {
 		if err != nil {
 			return fmt.Errorf("producer.SendMessages %w", err)
 		}
+		s.log.Info("producer sendMessagesBatch", "messages", messages)
 
 		return nil
 	})

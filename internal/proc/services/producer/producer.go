@@ -1,44 +1,47 @@
 package producer
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/Alekseyt9/upscaler/internal/common/model"
+	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/IBM/sarama"
 )
 
 type Producer struct {
 	topic    string
 	producer sarama.SyncProducer
+	log      *slog.Logger
 }
 
 // NewProducer создает новый продюсер, который будет отправлять сообщения в указанный топик.
-func NewProducer(brokers []string, topic string) (*Producer, error) {
+func NewProducer(log *slog.Logger, opt cmodel.BrokerOptions) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 
-	producer, err := sarama.NewSyncProducer(brokers, config)
+	producer, err := sarama.NewSyncProducer(opt.KafkaBrokers, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Producer{
-		topic:    topic,
+		topic:    opt.Topic,
 		producer: producer,
+		log:      log,
 	}, nil
 }
 
 // Send отправляет одно сообщение в Kafka топик.
-func (b *Producer) Send(msg model.BrokerMessageResult) error {
+func (p *Producer) Send(msg model.BrokerMessageResult) error {
 	message := &sarama.ProducerMessage{
-		Topic: b.topic,
+		Topic: p.topic,
 		Value: sarama.StringEncoder(msg.Result),
 	}
 
-	_, _, err := b.producer.SendMessage(message)
+	_, _, err := p.producer.SendMessage(message)
 	if err != nil {
-		log.Printf("Ошибка при отправке сообщения в Kafka: %v", err)
+		p.log.Error("producer Send Ошибка при отправке сообщения в Kafka", "error", err)
 		return err
 	}
 

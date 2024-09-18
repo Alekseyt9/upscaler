@@ -11,3 +11,9 @@ type BrokerMessageResult struct {
 	Result string
 	Error  string
 }
+
+type BrokerOptions struct {
+	Topic         string
+	KafkaBrokers  []string
+	ConsumerGroup string
+}

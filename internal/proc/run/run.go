@@ -1,10 +1,14 @@
 package run
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 	"github.com/Alekseyt9/upscaler/internal/proc/config"
 	"github.com/Alekseyt9/upscaler/internal/proc/services/consumer"
@@ -15,31 +19,46 @@ import (
 	"github.com/Alekseyt9/upscaler/pkg/workerpool"
 )
 
-func Run(cfg *config.Config) error {
+func Run(cfg *config.Config, log *slog.Logger) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,
 		SecretAccessKey: cfg.S3SecretAccessKey,
 		BucketName:      cfg.S3BucketName,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("s3store.New %w", err)
 	}
 
 	wp := workerpool.New(1) // there is no point in running upscale in parallel
-	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	fproc := fileprocessor.NewFileProcessor("")
 	idcheck := idcheck.NewIdCheckService(cfg.RedisAddr, 24*time.Hour)
 
-	producer, err := producer.NewProducer([]string{cfg.KafkaAddr}, cfg.KafkaTopicResult)
+	producer, err := producer.NewProducer(log, model.BrokerOptions{
+		Topic:        cfg.KafkaTopicResult,
+		KafkaBrokers: []string{cfg.KafkaAddr},
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("producer.NewProducer %w", err)
 	}
 
 	proc := processor.New(wp, s3, log, fproc, idcheck, producer)
-	_, err = consumer.NewConsumer([]string{cfg.KafkaAddr}, cfg.KafkaTopic, cfg.KafkeCunsumerGroup, proc)
+	cons, err := consumer.NewConsumer(proc, log, model.BrokerOptions{
+		Topic:         cfg.KafkaTopicResult,
+		KafkaBrokers:  []string{cfg.KafkaAddr},
+		ConsumerGroup: cfg.KafkeCunsumerGroup,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("consumer.NewConsumer %w", err)
 	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	<-stop
+	log.Info("Shutting down gracefully...")
+
+	producer.Close()
+	cons.Close()
 
 	return nil
 }

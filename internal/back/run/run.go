@@ -18,12 +18,11 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/services/messagebroker"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
+	"github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
 )
 
-func Run(cfg *config.Config) error {
-	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
+func Run(cfg *config.Config, log *slog.Logger) error {
 	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
 	if err != nil {
 		return fmt.Errorf("store.NewPostgresStore %w", err)
@@ -39,12 +38,17 @@ func Run(cfg *config.Config) error {
 	}
 
 	us := userserv.New(store, s3)
-	consumer, err := messagebroker.NewConsumer([]string{cfg.KafkaAddr}, cfg.KafkaTopicResult, cfg.KafkeCunsumerGroup, us)
+	consumer, err := messagebroker.NewConsumer(us, log, model.BrokerOptions{
+		Topic:         cfg.KafkaTopicResult,
+		KafkaBrokers:  []string{cfg.KafkaAddr},
+		ConsumerGroup: cfg.KafkeCunsumerGroup})
 	if err != nil {
 		return fmt.Errorf("messagebroker.NewConsumer %w", err)
 	}
 
-	producer, err := messagebroker.NewProducer(store, []string{cfg.KafkaAddr}, cfg.KafkaTopic)
+	producer, err := messagebroker.NewProducer(store, log, model.BrokerOptions{
+		Topic:        cfg.KafkaTopic,
+		KafkaBrokers: []string{cfg.KafkaAddr}})
 	if err != nil {
 		return fmt.Errorf("messagebroker.NewProducer %w", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/proc/services/processor"
@@ -16,32 +16,44 @@ type Consumer struct {
 	brokers       []string
 	topic         string
 	group         string
+	log           *slog.Logger
+}
+
+// ConsumerGroupHandler реализует интерфейс sarama.ConsumerGroupHandler
+type ConsumerGroupHandler struct {
+	proc *processor.ProcessorService
+	log  *slog.Logger
 }
 
 // NewConsumer создает новый экземпляр ConsumerService
-func NewConsumer(brokers []string, topic, group string, proc *processor.ProcessorService) (*Consumer, error) {
+func NewConsumer(proc *processor.ProcessorService, log *slog.Logger, opt cmodel.BrokerOptions) (*Consumer, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Version = sarama.V2_6_0_0
 
-	consumerGroup, err := sarama.NewConsumerGroup(brokers, group, config)
+	consumerGroup, err := sarama.NewConsumerGroup(opt.KafkaBrokers, opt.ConsumerGroup, config)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка создания группы потребителей: %w", err)
 	}
 
-	handler := ConsumerGroupHandler{proc: proc}
+	handler := ConsumerGroupHandler{
+		proc: proc,
+		log:  log,
+	}
+
 	cs := &Consumer{
 		consumerGroup: consumerGroup,
-		brokers:       brokers,
-		topic:         topic,
-		group:         group,
+		brokers:       opt.KafkaBrokers,
+		topic:         opt.Topic,
+		group:         opt.ConsumerGroup,
+		log:           log,
 	}
 
 	go func() {
 		for {
 			ctx := context.Background()
 			if err := cs.consumerGroup.Consume(ctx, []string{cs.topic}, &handler); err != nil {
-				log.Fatalf("Ошибка при обработке сообщений: %v", err)
+				log.Error("consumerGroup.Consume Ошибка при обработке сообщений", "error", err)
 			}
 		}
 	}()
@@ -52,13 +64,8 @@ func NewConsumer(brokers []string, topic, group string, proc *processor.Processo
 // Close завершает работу consumer group
 func (cs *Consumer) Close() {
 	if err := cs.consumerGroup.Close(); err != nil {
-		log.Printf("Ошибка при закрытии consumer group: %v", err)
+		cs.log.Error("Ошибка при закрытии consumer group", "error", err)
 	}
-}
-
-// ConsumerGroupHandler реализует интерфейс sarama.ConsumerGroupHandler
-type ConsumerGroupHandler struct {
-	proc *processor.ProcessorService
 }
 
 // Setup вызывается перед началом потребления
@@ -77,16 +84,17 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 		var brokerMessage cmodel.BrokerMessage
 		err := json.Unmarshal(message.Value, &brokerMessage)
 		if err != nil {
-			log.Printf("Ошибка десериализации сообщения: %v", err)
+			h.log.Error("consumer ConsumeClaim Ошибка десериализации сообщения", "error", err)
 			continue
 		}
 
 		idempotencyKey := string(message.Key)
-		fmt.Printf("Получено сообщение: TaskId=%d, SrcFileURL=%s, DestFileURL=%s\n", brokerMessage.TaskId, brokerMessage.SrcFileURL, brokerMessage.DestFileURL)
+		h.log.Info("consumer ConsumeClaim Получено сообщение", "TaskId", brokerMessage.TaskId,
+			"SrcFileURL", brokerMessage.SrcFileURL, "DestFileURL", brokerMessage.DestFileURL)
 
 		err = h.proc.Process(context.Background(), brokerMessage, idempotencyKey)
 		if err != nil {
-			log.Printf("Ошибка при обработке сообщения: %v", err)
+			h.log.Error("consumer ConsumeClaim proc.Process Ошибка при обработке сообщения", "error", err)
 			continue
 		}
 
