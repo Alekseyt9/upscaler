@@ -33,34 +33,23 @@ func TestYOStorage_GetPresigned(t *testing.T) {
 	assert.Equal(t, count, len(objects), "Expected number of presigned URLs does not match")
 
 	url := objects[0].Url
-
-	// Тестовые данные для загрузки
 	testData := []byte("This is a test content for uploading to Yandex Object Storage.")
 
-	// Создаем новый HTTP-запрос PUT
 	req, err := http.NewRequest("PUT", url, bytes.NewReader(testData))
 	require.NoError(t, err, "Failed to create new HTTP request")
 
-	// Не устанавливаем дополнительных заголовков
-
-	// Логируем запрос
 	requestDump, err := httputil.DumpRequestOut(req, true)
 	require.NoError(t, err, "Failed to dump request")
 	t.Logf("Request:\n%s", string(requestDump))
 
-	// Выполняем запрос
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err, "Failed to perform HTTP request")
 	defer resp.Body.Close()
 
-	// Логируем ответ
 	responseDump, err := httputil.DumpResponse(resp, true)
 	require.NoError(t, err, "Failed to dump response")
 	t.Logf("Response:\n%s", string(responseDump))
 
-	// Проверяем статус ответа
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Expected HTTP status 200 OK")
-
-	// Дополнительные проверки...
 }

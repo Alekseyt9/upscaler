@@ -1,3 +1,6 @@
+// Package run provides the functionality to initialize and run the main
+// application services, setting up the necessary dependencies and
+// handling graceful shutdowns.
 package run
 
 import (
@@ -19,6 +22,13 @@ import (
 	"github.com/Alekseyt9/upscaler/pkg/workerpool"
 )
 
+// Run initializes and starts the main application services
+//
+// Parameters:
+//   - cfg: The configuration settings for the application.
+//   - log: A logger to capture and output log messages.
+//
+// Returns an error if the initialization of any service fails.
 func Run(cfg *config.Config, log *slog.Logger) error {
 	s3, err := s3store.New(s3store.S3Options{
 		AccessKeyID:     cfg.S3AccessKeyID,

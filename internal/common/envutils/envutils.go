@@ -1,3 +1,5 @@
+// Package envutils provides utilities for loading environment variables,
+// including functions for loading them from a .env file in the project's root directory.
 package envutils
 
 import (

@@ -1,3 +1,7 @@
+// Package s3store provides an interface and implementation for interacting
+// with an S3-compatible storage service, such as Yandex Cloud Storage.
+// It allows for operations such as generating presigned URLs, uploading files,
+// and downloading files to temporary storage.
 package s3store
 
 import (
@@ -15,6 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// S3Store defines the interface for S3 storage operations.
 type S3Store interface {
 	GetPresigned(count int) ([]Link, error)
 	GetPresignedLoad(key string) (string, error)
@@ -22,22 +27,26 @@ type S3Store interface {
 	Upload(url string, path string) error
 }
 
+// YOStorage implements the S3Store interface using AWS S3 SDK.
 type YOStorage struct {
 	client *s3.Client
 	opts   S3Options
 }
 
+// S3Options contains the configuration options for connecting to the S3 service.
 type S3Options struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	BucketName      string
 }
 
+// Link represents a presigned URL and its associated key.
 type Link struct {
 	Url string
 	Key string
 }
 
+// New creates a new YOStorage instance with the given S3Options.
 func New(opt S3Options) (*YOStorage, error) {
 	c, err := initStorage(opt)
 	if err != nil {
@@ -51,6 +60,7 @@ func New(opt S3Options) (*YOStorage, error) {
 	return &inst, err
 }
 
+// initStorage initializes the S3 client with the given S3Options.
 func initStorage(opts S3Options) (*s3.Client, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion("ru-central1"),
@@ -64,7 +74,7 @@ func initStorage(opts S3Options) (*s3.Client, error) {
 			})),
 	)
 	if err != nil {
-		panic("Ошибка загрузки конфигурации: " + err.Error())
+		panic("Error loading configuration: " + err.Error())
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -74,6 +84,7 @@ func initStorage(opts S3Options) (*s3.Client, error) {
 	return client, nil
 }
 
+// GetPresigned generates a list of presigned URLs for uploading files.
 func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	var objects []Link
 	presignClient := s3.NewPresignClient(s.client)
@@ -99,6 +110,7 @@ func (s *YOStorage) GetPresigned(count int) ([]Link, error) {
 	return objects, nil
 }
 
+// GetPresignedLoad generates a presigned URL for downloading a file from S3.
 func (s *YOStorage) GetPresignedLoad(key string) (string, error) {
 	presignClient := s3.NewPresignClient(s.client)
 	req, err := presignClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{
@@ -110,47 +122,42 @@ func (s *YOStorage) GetPresignedLoad(key string) (string, error) {
 		return "", fmt.Errorf("presignClient.PresignGetObject %w", err)
 	}
 
-	/*
-		urlStr, err := req.Presign(15 * time.Minute)
-		if err != nil {
-			return "", fmt.Errorf("ошибка генерации presigned URL: %w", err)
-		}
-	*/
-
 	return req.URL, nil
 }
 
+// DownloadAndSaveTemp downloads a file from the given URL and saves it as a temporary file.
 func (s *YOStorage) DownloadAndSaveTemp(url string, ext string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("ошибка при скачивании файла: %w", err)
+		return "", fmt.Errorf("error downloading file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	tempFile, err := os.CreateTemp("", "downloaded-*"+ext)
 	if err != nil {
-		return "", fmt.Errorf("ошибка создания временного файла: %w", err)
+		return "", fmt.Errorf("error creating temporary file: %w", err)
 	}
 	defer tempFile.Close()
 
 	_, err = io.Copy(tempFile, resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("ошибка записи во временный файл: %w", err)
+		return "", fmt.Errorf("error writing to temporary file: %w", err)
 	}
 
 	return tempFile.Name(), nil
 }
 
+// Upload uploads a file to the specified presigned URL.
 func (s *YOStorage) Upload(url string, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("ошибка открытия файла: %w", err)
+		return fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
 
 	req, err := http.NewRequest(http.MethodPut, url, file)
 	if err != nil {
-		return fmt.Errorf("ошибка создания HTTP-запроса: %w", err)
+		return fmt.Errorf("error creating HTTP request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -158,12 +165,12 @@ func (s *YOStorage) Upload(url string, path string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("ошибка отправки HTTP-запроса: %w", err)
+		return fmt.Errorf("error sending HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("неудачная загрузка файла, статус: %s", resp.Status)
+		return fmt.Errorf("file upload failed, status: %s", resp.Status)
 	}
 
 	return nil

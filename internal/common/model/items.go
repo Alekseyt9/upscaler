@@ -1,5 +1,8 @@
+// Package model contains data structures used for messaging and configuration
+// in the message broker system
 package model
 
+// BrokerMessage represents a message to be sent to a broker
 type BrokerMessage struct {
 	SrcFileURL    string
 	DestFileURL   string
@@ -10,6 +13,7 @@ type BrokerMessage struct {
 	QueueID       int64
 }
 
+// BrokerMessageResult represents the result of processing a broker message
 type BrokerMessageResult struct {
 	Result      string
 	Error       string
@@ -19,6 +23,7 @@ type BrokerMessageResult struct {
 	QueueID     int64
 }
 
+// BrokerOptions defines the configuration options for a broker
 type BrokerOptions struct {
 	Topic         string
 	KafkaBrokers  []string
