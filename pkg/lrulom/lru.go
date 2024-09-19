@@ -1,3 +1,4 @@
+// Package lrulom provides an LRU cache wrapper with automatic loading of missing values.
 package lrulom
 
 import (
@@ -6,14 +7,19 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
-// LRULoadOnMiss обертка для LRU-кэша с автоматической подгрузкой
+// LRULoadOnMiss is a wrapper around an LRU cache that automatically loads missing values using a provided load function.
 type LRULoadOnMiss[K comparable, V any] struct {
 	cache    *lru.Cache[K, V]
 	loadFunc func(key K) (V, error)
 	mu       sync.RWMutex
 }
 
-// New создает новый экземпляр LRULoadOnMiss с заданным размером и функцией загрузки
+// New creates a new instance of LRULoadOnMiss with the specified size and load function.
+//
+// size specifies the maximum number of entries in the cache.
+// loadFunc is a function that loads a value when it is not found in the cache.
+//
+// Returns a pointer to an LRULoadOnMiss instance or an error if the LRU cache creation fails.
 func New[K comparable, V any](size int, loadFunc func(key K) (V, error)) (*LRULoadOnMiss[K, V], error) {
 	cache, err := lru.New[K, V](size)
 	if err != nil {
@@ -25,7 +31,12 @@ func New[K comparable, V any](size int, loadFunc func(key K) (V, error)) (*LRULo
 	}, nil
 }
 
-// GetOrLoad пытается получить значение из кэша или загружает его, если значение отсутствует
+// GetOrLoad attempts to retrieve a value from the cache. If the value is not present,
+// it uses the load function to load the value, stores it in the cache, and returns it.
+//
+// key is the key of the value to retrieve.
+//
+// Returns the value associated with the key or an error if loading the value fails.
 func (l *LRULoadOnMiss[K, V]) GetOrLoad(key K) (V, error) {
 	l.mu.RLock()
 	value, ok := l.cache.Get(key)
@@ -38,6 +49,7 @@ func (l *LRULoadOnMiss[K, V]) GetOrLoad(key K) (V, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// Double-check if the value was loaded while acquiring the write lock
 	if value, ok := l.cache.Get(key); ok {
 		return value, nil
 	}
@@ -52,21 +64,30 @@ func (l *LRULoadOnMiss[K, V]) GetOrLoad(key K) (V, error) {
 	return value, nil
 }
 
-// Add добавляет значение в кэш
+// Add adds a value to the cache.
+//
+// key is the key of the value to add.
+// value is the value to store in the cache.
 func (l *LRULoadOnMiss[K, V]) Add(key K, value V) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.cache.Add(key, value)
 }
 
-// Remove удаляет значение из кэша
+// Remove removes a value from the cache.
+//
+// key is the key of the value to remove.
 func (l *LRULoadOnMiss[K, V]) Remove(key K) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.cache.Remove(key)
 }
 
-// Get пытается получить значение из кэша
+// Get attempts to retrieve a value from the cache without triggering the load function.
+//
+// key is the key of the value to retrieve.
+//
+// Returns the value associated with the key and a boolean indicating whether the value was found in the cache.
 func (l *LRULoadOnMiss[K, V]) Get(key K) (V, bool) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()

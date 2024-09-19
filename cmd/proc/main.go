@@ -1,3 +1,5 @@
+// Package main is the entry point for the application.
+// It handles the initialization of logging, configuration loading, and server startup.
 package main
 
 import (
@@ -8,6 +10,8 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/proc/run"
 )
 
+// main initializes logging, loads the configuration, and starts the server.
+// It logs any errors that occur during configuration loading or server startup.
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
