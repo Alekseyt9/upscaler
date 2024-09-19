@@ -367,6 +367,7 @@ func (t *OST) Insert(item Item) {
 	t.root.append(item)
 }
 
+/*
 func (t *OST) Delete(item Item) {
 	if t.root == nil {
 		return
@@ -375,6 +376,19 @@ func (t *OST) Delete(item Item) {
 	if isDel, newRoot := t.root.remove(item); isDel && newRoot != nil {
 		t.root = newRoot
 		t.root.rebalance()
+	}
+}*/
+
+func (t *OST) Delete(item Item) {
+	if t.root == nil {
+		return
+	}
+
+	if isDel, newRoot := t.root.remove(item); isDel {
+		t.root = newRoot
+		if t.root != nil {
+			t.root.rebalance()
+		}
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sync"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/pkg/lrulom"
@@ -13,44 +14,11 @@ import (
 )
 
 type CachedStore struct {
-	queue    *ost.OST
-	queuemap map[int64]*CacheQueueItem
+	queue    *ost.POST
+	queuemap sync.Map
 	lru      *lrulom.LRULoadOnMiss[int64, map[int64]*UserFileItem]
 	dbstore  Store
 	log      *slog.Logger
-}
-
-type CacheQueueItem struct {
-	ID    int64
-	Order int64
-}
-
-func (c CacheQueueItem) Less(item ost.Item) bool {
-	other, ok := item.(CacheQueueItem)
-	if !ok {
-		return false
-	}
-	return c.Order < other.Order
-}
-
-func (c CacheQueueItem) Greater(item ost.Item) bool {
-	other, ok := item.(CacheQueueItem)
-	if !ok {
-		return false
-	}
-	return c.Order > other.Order
-}
-
-func (c CacheQueueItem) Equal(item ost.Item) bool {
-	other, ok := item.(CacheQueueItem)
-	if !ok {
-		return false
-	}
-	return c.Order == other.Order
-}
-
-func (c CacheQueueItem) Key() int {
-	return int(c.ID)
 }
 
 func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
@@ -70,8 +38,8 @@ func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 	}
 
 	cs := &CachedStore{
-		queue:    ost.New(),
-		queuemap: make(map[int64]*CacheQueueItem),
+		queue:    ost.NewPOST(),
+		queuemap: sync.Map{},
 		lru:      lru,
 		dbstore:  store,
 		log:      log,
@@ -88,14 +56,14 @@ func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 			Order: qi.Order,
 		}
 		cs.queue.Insert(cqi)
-		cs.queuemap[qi.ID] = &cqi
+		cs.queuemap.Store(qi.ID, &cqi)
 	}
 
 	return cs, nil
 }
 
 func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []UserFileItem, error) {
-	// first create in the database, then add to the cache
+	// First, create in the database, then add to the cache
 	qitems, filesitems, err := s.dbstore.CreateTasks(ctx, tasks)
 	if err != nil {
 		return nil, nil, err
@@ -106,7 +74,7 @@ func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) 
 			ID:    qi.ID,
 			Order: qi.Order,
 		}
-		s.queuemap[qi.ID] = &cqi
+		s.queuemap.Store(qi.ID, &cqi)
 		s.queue.Insert(cqi)
 	}
 
@@ -130,8 +98,9 @@ func (s *CachedStore) GetState(ctx context.Context, userId int64) ([]model.Clien
 	res := make([]model.ClientUserItem, 0)
 	for _, v := range items {
 		var rank int
-		qitem, ok := s.queuemap[v.QueueID]
+		value, ok := s.queuemap.Load(v.QueueID)
 		if ok {
+			qitem := value.(*CacheQueueItem)
 			rank = s.queue.Rank(*qitem)
 		}
 
@@ -164,12 +133,13 @@ func (s *CachedStore) FinishTasks(ctx context.Context, msgs []model.FinishedTask
 			return err
 		}
 
-		qi, ok := s.queuemap[m.QueueID]
+		value, ok := s.queuemap.Load(m.QueueID)
 		if !ok {
 			return fmt.Errorf("s.queuemap[m.QueueId]")
 		}
 
-		delete(s.queuemap, m.QueueID)
+		qi := value.(*CacheQueueItem)
+		s.queuemap.Delete(m.QueueID)
 		s.queue.Delete(*qi)
 
 		ufile, ok := ufiles[m.FileID]
