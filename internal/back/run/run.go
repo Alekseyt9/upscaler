@@ -24,9 +24,14 @@ import (
 )
 
 func Run(cfg *config.Config, log *slog.Logger) error {
-	store, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
+	pgstore, err := store.NewPostgresStore(context.Background(), cfg.PgDataBaseDSN, log)
 	if err != nil {
 		return fmt.Errorf("store.NewPostgresStore %w", err)
+	}
+
+	store, err := store.NewCachedStore(pgstore, log)
+	if err != nil {
+		return fmt.Errorf("store.NewCachedStore %w", err)
 	}
 
 	s3, err := s3store.New(s3store.S3Options{

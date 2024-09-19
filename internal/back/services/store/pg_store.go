@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
@@ -68,11 +69,11 @@ func getMigrationPath() string {
 	return "file://" + migrationsPath
 }
 
-// CreateTasks adds a tasks to the queue, userfiles, outbox.
-func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) error {
+// CreateTasks adds tasks to the queue, userfiles, and outbox.
+func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []UserFileItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("pool.Begin %w", err)
+		return nil, nil, fmt.Errorf("pool.Begin %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -80,27 +81,55 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 		}
 	}()
 
-	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id`
+	insertQueueStmt := `INSERT INTO queue (order_num) VALUES (DEFAULT) RETURNING id, order_num`
 	insertUserFileStmt := `INSERT INTO userfiles (queue_id, user_id, file_name, src_file_url, src_file_key, dest_file_url, dest_file_key, state) 
-						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+						   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`
 	insertOutboxStmt := `INSERT INTO outbox (payload, status, idempotency_key) 
 						 VALUES ($1, 'PENDING', $2)`
 
+	var queueItems []model.QueueItem
+	var userItems []UserFileItem
+
 	for _, task := range tasks {
 		var queueID int64
-		err = tx.QueryRow(ctx, insertQueueStmt).Scan(&queueID)
+		var orderNum int64
+		err = tx.QueryRow(ctx, insertQueueStmt).Scan(&queueID, &orderNum)
 		if err != nil {
-			return fmt.Errorf("tx.QueryRow insertQueueStmt %w", err)
+			return nil, nil, fmt.Errorf("tx.QueryRow insertQueueStmt %w", err)
 		}
 
 		var fileID int64
+		var createdAt time.Time
 		err = tx.QueryRow(ctx,
 			insertUserFileStmt,
 			queueID, task.UserID, task.FileName, task.SrcFileURL, task.SrcFileKey, task.DestFileURL,
-			task.DestFileKey, "PENDING").Scan(&fileID)
+			task.DestFileKey, "PENDING").Scan(&fileID, &createdAt)
 		if err != nil {
-			return fmt.Errorf("tx.QueryRow insertUserFileStmt %w", err)
+			return nil, nil, fmt.Errorf("tx.QueryRow insertUserFileStmt %w", err)
 		}
+
+		// Prepare QueueItem
+		queueItem := model.QueueItem{
+			ID:    queueID,
+			Order: orderNum,
+		}
+		queueItems = append(queueItems, queueItem)
+
+		// Prepare UserItem
+		userItem := UserFileItem{
+			ID:          fileID,
+			QueueID:     queueID,
+			UserID:      task.UserID,
+			OrderNum:    orderNum,
+			SrcFileURL:  task.SrcFileURL,
+			SrcFileKey:  task.SrcFileKey,
+			DestFileURL: task.DestFileURL,
+			DestFileKey: task.DestFileKey,
+			State:       "PENDING",
+			CreatedAt:   createdAt,
+			FileName:    task.FileName,
+		}
+		userItems = append(userItems, userItem)
 
 		payload := cmodel.BrokerMessage{
 			SrcFileURL:    task.SrcFileURL,
@@ -113,21 +142,21 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {
-			return fmt.Errorf("json.Marshal %w", err)
+			return nil, nil, fmt.Errorf("json.Marshal %w", err)
 		}
 
 		_, err = tx.Exec(ctx, insertOutboxStmt, plJson, strconv.FormatInt(fileID, 10))
 		if err != nil {
-			return fmt.Errorf("tx.Exec insertOutboxStmt %w", err)
+			return nil, nil, fmt.Errorf("tx.Exec insertOutboxStmt %w", err)
 		}
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return fmt.Errorf("tx.Commit %w", err)
+		return nil, nil, fmt.Errorf("tx.Commit %w", err)
 	}
 
-	return nil
+	return queueItems, userItems, nil
 }
 
 // GetState retrieves the user state based on the userId.
@@ -342,7 +371,7 @@ func (s *PostgresStore) GetQueue(ctx context.Context) ([]model.QueueItem, error)
 }
 
 // GetUserFiles retrieves all user files based on the userID.
-func (s *PostgresStore) GetUserFiles(ctx context.Context, userID int64) ([]UserItem, error) {
+func (s *PostgresStore) GetUserFiles(ctx context.Context, userID int64) ([]UserFileItem, error) {
 	query := `SELECT id, queue_id, user_id, order_num, src_file_url, src_file_key, dest_file_url, dest_file_key, state, created_at, file_name
               FROM userfiles
               WHERE user_id = $1
@@ -354,10 +383,10 @@ func (s *PostgresStore) GetUserFiles(ctx context.Context, userID int64) ([]UserI
 	}
 	defer rows.Close()
 
-	var userFiles []UserItem
+	var userFiles []UserFileItem
 
 	for rows.Next() {
-		var item UserItem
+		var item UserFileItem
 		var queueID sql.NullInt64
 
 		if err := rows.Scan(&item.ID, &queueID, &item.UserID, &item.OrderNum, &item.SrcFileURL,

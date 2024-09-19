@@ -7,7 +7,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 )
 
-type UserItem struct {
+type UserFileItem struct {
 	ID          int64
 	QueueID     int64
 	UserID      int64
@@ -23,7 +23,7 @@ type UserItem struct {
 
 type Store interface {
 	// add to queue, userfiles, outbox
-	CreateTasks(ctx context.Context, tasks []model.StoreTask) error
+	CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []UserFileItem, error)
 
 	// get user state
 	GetState(ctx context.Context, userId int64) ([]model.ClientUserItem, error)
@@ -37,7 +37,7 @@ type Store interface {
 
 	GetQueue(ctx context.Context) ([]model.QueueItem, error)
 
-	GetUserFiles(ctx context.Context, userID int64) ([]UserItem, error)
+	GetUserFiles(ctx context.Context, userID int64) ([]UserFileItem, error)
 
 	Close() error
 }

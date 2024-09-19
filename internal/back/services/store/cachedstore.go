@@ -15,7 +15,7 @@ import (
 type CachedStore struct {
 	queue    *ost.OST
 	queuemap map[int64]*CacheQueueItem
-	lru      *lrulom.LRULoadOnMiss[int64, map[int64]*UserItem]
+	lru      *lrulom.LRULoadOnMiss[int64, map[int64]*UserFileItem]
 	dbstore  Store
 	log      *slog.Logger
 }
@@ -55,28 +55,33 @@ func (c CacheQueueItem) Key() int {
 
 func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 	ctx := context.Background()
-	lruLoadFunc := func(key int64) (map[int64]*UserItem, error) {
+	lruLoadFunc := func(key int64) (map[int64]*UserFileItem, error) {
 		v, err := store.GetUserFiles(ctx, key)
-		m := make(map[int64]*UserItem, len(v))
+		m := make(map[int64]*UserFileItem, len(v))
 		for _, item := range v {
 			m[item.ID] = &item
 		}
 		return m, err
 	}
 
-	lru, err := lrulom.New[int64, map[int64]*UserItem](500, lruLoadFunc)
+	lru, err := lrulom.New(500, lruLoadFunc)
 	if err != nil {
 		return nil, err
 	}
 
 	cs := &CachedStore{
-		queue:   ost.New(),
-		lru:     lru,
-		dbstore: store,
-		log:     log,
+		queue:    ost.New(),
+		queuemap: make(map[int64]*CacheQueueItem),
+		lru:      lru,
+		dbstore:  store,
+		log:      log,
 	}
 
 	qs, err := store.GetQueue(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, qi := range qs {
 		cqi := CacheQueueItem{
 			ID:    qi.ID,
@@ -89,49 +94,46 @@ func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 	return cs, nil
 }
 
-func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) error {
-	// first created in the database, then added to the cache
+func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []UserFileItem, error) {
+	// first create in the database, then add to the cache
+	qitems, filesitems, err := s.dbstore.CreateTasks(ctx, tasks)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	/*
-		for _, t := range tasks {
-			s.queueMaxID++
-			s.queueMaxOrder++
-
-			q := CacheQueueItem{
-				ID:    s.queueMaxID,
-				Order: s.queueMaxOrder,
-			}
-			s.queue.Insert(q)
-
-			s.lru.Cache.Add()
+	for _, qi := range qitems {
+		cqi := CacheQueueItem{
+			ID:    qi.ID,
+			Order: qi.Order,
 		}
+		s.queuemap[qi.ID] = &cqi
+		s.queue.Insert(cqi)
+	}
 
-		go func() {
-			err := s.dbstore.CreateTasks(ctx, tasks)
-			if err != nil {
-				s.log.Error("CachedStore CreateTasks dbstore.CreateTasks", "error", err)
-			}
-		}()
-	*/
+	for _, fi := range filesitems {
+		ufiles, err := s.lru.GetOrLoad(fi.UserID)
+		if err != nil {
+			return nil, nil, err
+		}
+		ufiles[fi.ID] = &fi
+	}
 
-	return nil
+	return qitems, filesitems, nil
 }
 
 func (s *CachedStore) GetState(ctx context.Context, userId int64) ([]model.ClientUserItem, error) {
 	items, err := s.lru.GetOrLoad(userId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cached store lru.GetOrLoad %w", err)
 	}
 
-	//TODO sort
-
-	res := make([]model.ClientUserItem, len(items))
+	res := make([]model.ClientUserItem, 0)
 	for _, v := range items {
+		var rank int
 		qitem, ok := s.queuemap[v.QueueID]
-		if !ok {
-			return nil, fmt.Errorf("s.queuemap[item.QueueID]")
+		if ok {
+			rank = s.queue.Rank(*qitem)
 		}
-		rank := s.queue.Rank(*qitem)
 
 		ci := model.ClientUserItem{
 			Order:         v.OrderNum,
@@ -178,4 +180,24 @@ func (s *CachedStore) FinishTasks(ctx context.Context, msgs []model.FinishedTask
 	}
 
 	return nil
+}
+
+func (s *CachedStore) CreateUser(ctx context.Context) (int64, error) {
+	return s.dbstore.CreateUser(ctx)
+}
+
+func (s *CachedStore) SendTasksToBroker(ctx context.Context, sendFunc func(items []model.OutboxItem) error) error {
+	return s.dbstore.SendTasksToBroker(ctx, sendFunc)
+}
+
+func (s *CachedStore) GetQueue(ctx context.Context) ([]model.QueueItem, error) {
+	return s.dbstore.GetQueue(ctx)
+}
+
+func (s *CachedStore) GetUserFiles(ctx context.Context, userID int64) ([]UserFileItem, error) {
+	return s.dbstore.GetUserFiles(ctx, userID)
+}
+
+func (s *CachedStore) Close() error {
+	return s.dbstore.Close()
 }

@@ -60,14 +60,16 @@ function createTableRows(data) {
         row.appendChild(fileNameCell);
 
         const linkCell = document.createElement('td');
-        if (item.Link) {
+        if (item.Status == "PROCESSED") {
             const link = document.createElement('a');
             link.href = item.Link;
             link.textContent = 'Скачать';
             link.setAttribute('download', item.FileName);
             linkCell.appendChild(link);
         } else {
-            linkCell.textContent = item.QueuePosition;
+            if (item.Status == "PENDING"){
+                linkCell.textContent = item.QueuePosition;
+            }
         }
         row.appendChild(linkCell);
 

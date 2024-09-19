@@ -54,7 +54,7 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 		tasks = append(tasks, task)
 	}
 
-	err = u.store.CreateTasks(ctx, tasks)
+	_, _, err = u.store.CreateTasks(ctx, tasks)
 	if err != nil {
 		return fmt.Errorf("store.CreateTasks %w", err)
 	}
