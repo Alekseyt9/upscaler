@@ -4,13 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const socket = new WebSocket(loginUrl);
 
     socket.onopen = () => {
-        console.log('Соединение с WebSocket установлено');
+        console.log('WebSocket connection established');
         loadTableData();
     };
 
     socket.onmessage = (event) => {
         const message = event.data;
-        console.log('Получено сообщение:', message);
+        console.log('Message received:', message);
 
         if (message === 'update') {
             loadTableData();
@@ -18,11 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     socket.onerror = (error) => {
-        console.error('Ошибка WebSocket:', error);
+        console.error('WebSocket error:', error);
     };
 
     socket.onclose = () => {
-        console.log('WebSocket соединение закрыто');
+        console.log('WebSocket connection closed');
     };
 });
 
@@ -30,7 +30,7 @@ function loadTableData() {
     fetch('/api/user/getstate')
         .then(response => {
             if (!response.ok) {
-                throw new Error('Ошибка сети');
+                throw new Error('Network error');
             }
             return response.json();
         })
@@ -38,7 +38,7 @@ function loadTableData() {
             createTableRows(data);
         })
         .catch(error => {
-            console.error('Ошибка при получении данных:', error);
+            console.error('Error fetching data:', error);
         });
 }
 
@@ -46,7 +46,7 @@ function createTableRows(data) {
     const tableBody = document.querySelector('.queue-table tbody');
     tableBody.innerHTML = '';
 
-    if (!data){
+    if (!data) {
         return;
     }
 
@@ -63,11 +63,11 @@ function createTableRows(data) {
         if (item.Status == "PROCESSED") {
             const link = document.createElement('a');
             link.href = item.Link;
-            link.textContent = 'Скачать';
+            link.textContent = 'Download';
             link.setAttribute('download', item.FileName);
             linkCell.appendChild(link);
         } else {
-            if (item.Status == "PENDING"){
+            if (item.Status == "PENDING") {
                 linkCell.textContent = item.QueuePosition;
             }
         }
@@ -146,7 +146,7 @@ function handleFileUpload(files) {
     .then(data => {
         console.log('Upload URLs:', data);
         if (data.length !== files.length) {
-            throw new Error('Количество файлов не соответствует количеству URL-адресов');
+            throw new Error('The number of files does not match the number of URLs');
         }
 
         const uploadPromises = data.map((item, index) => {
@@ -162,22 +162,22 @@ function handleFileUpload(files) {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Ошибка при загрузке файла ${file.name}: ${response.statusText}`);
+                    throw new Error(`Error uploading file ${file.name}: ${response.statusText}`);
                 }
-                console.log(`Файл ${file.name} успешно загружен.`);
+                console.log(`File ${file.name} uploaded successfully.`);
             })
             .catch(error => {
-                console.error(`Ошибка при загрузке файла ${file.name}:`, error);
+                console.error(`Error uploading file ${file.name}:`, error);
                 throw error; 
             });
         });
 
         Promise.all(uploadPromises)
             .then(() => {
-                console.log('Все файлы успешно загружены.');
+                console.log('All files uploaded successfully.');
 
-                fileInfos = []
-                for(var i=0; i<data.length; i++){
+                fileInfos = [];
+                for (var i = 0; i < data.length; i++) {
                     fileInfos.push({
                         Url: data[i].Url, 
                         Key: data[i].Key, 
@@ -195,15 +195,14 @@ function handleFileUpload(files) {
                 });
             })
             .catch(error => {
-                console.error('Ошибка при загрузке файлов:', error);
+                console.error('Error uploading files:', error);
             })
             .finally(() => {
                 loadingPanel.style.display = 'none';
                 dropzone.style.pointerEvents = 'auto';
                 dropzone.style.opacity = '1'; 
-
-                // refresh
-                loadTableData()
+                
+                loadTableData();
             });
     })
     .catch(error => {

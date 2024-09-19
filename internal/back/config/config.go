@@ -1,3 +1,5 @@
+// Package config provides functionality to load configuration settings
+// from environment variables into a Config struct.
 package config
 
 import (
@@ -5,19 +7,25 @@ import (
 	"github.com/caarlos0/env"
 )
 
+// Config holds the configuration settings required for the application.
 type Config struct {
-	BackAddress        string `env:"BACK_ADDRESS"`
-	PgDataBaseDSN      string `env:"DATABASE_DSN"`
-	S3AccessKeyID      string `env:"S3_ACCESSKEYID"`
-	S3SecretAccessKey  string `env:"S3_SECRETACCESSKEY"`
-	S3BucketName       string `env:"S3_BUCKETNAME"`
-	JWTSecret          string `env:"WT_SECRET"`
-	KafkaAddr          string `env:"KAFKA_ADDRESS"`
-	KafkaTopic         string `env:"KAFKA_TOPIC"`
-	KafkaTopicResult   string `env:"KAFKA_TOPIC_RESULT"`
-	KafkeCunsumerGroup string `env:"KAFKA_CONSUMER_GROUP"`
+	BackAddress        string `env:"BACK_ADDRESS"`         // Address of the backend service.
+	PgDataBaseDSN      string `env:"DATABASE_DSN"`         // Data source name for PostgreSQL database connection.
+	S3AccessKeyID      string `env:"S3_ACCESSKEYID"`       // Access key ID for the S3 storage.
+	S3SecretAccessKey  string `env:"S3_SECRETACCESSKEY"`   // Secret access key for the S3 storage.
+	S3BucketName       string `env:"S3_BUCKETNAME"`        // Name of the S3 bucket.
+	JWTSecret          string `env:"WT_SECRET"`            // Secret key used for JWT token generation.
+	KafkaAddr          string `env:"KAFKA_ADDRESS"`        // Address of the Kafka server.
+	KafkaTopic         string `env:"KAFKA_TOPIC"`          // Name of the Kafka topic for sending messages.
+	KafkaTopicResult   string `env:"KAFKA_TOPIC_RESULT"`   // Name of the Kafka topic for receiving results.
+	KafkeCunsumerGroup string `env:"KAFKA_CONSUMER_GROUP"` // Name of the Kafka consumer group.
 }
 
+// LoadConfig loads the configuration settings from environment variables
+//
+// Returns:
+//   - A pointer to a Config instance.
+//   - An error if the environment variables cannot be loaded or parsed.
 func LoadConfig() (*Config, error) {
 	err := envutils.LoadEnv()
 	if err != nil {
