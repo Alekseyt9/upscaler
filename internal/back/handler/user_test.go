@@ -45,8 +45,6 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 		},
 	}
 
-	//err := envutils.LoadEnv()
-	//require.NoError(t, err, "Failed to load env")
 	cfg, err := config.LoadConfig()
 	require.NoError(t, err, "Failed to load config")
 	if cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
@@ -62,7 +60,7 @@ func TestFrontHandler_GetPresignedURLs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			h := &FrontHandler{s3: s3s}
+			h := &ServerHandler{s3: s3s}
 			req := httptest.NewRequest("GET", "/?"+tt.queryParam, nil)
 			w := httptest.NewRecorder()
 

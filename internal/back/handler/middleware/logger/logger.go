@@ -19,16 +19,22 @@ type ResponseWriter interface {
 	WriteHeader(statusCode int)
 }
 
+// responseData holds information about the HTTP response, including
+// the status code and the size of the response in bytes.
 type responseData struct {
-	status int
-	size   int
+	status int // HTTP status code of the response
+	size   int // Size of the response in bytes
 }
 
+// loggingResponseWriter is a wrapper around http.ResponseWriter that captures
+// the status code and response size for logging purposes.
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	responseData *responseData
 }
 
+// Hijack allows the loggingResponseWriter to hijack the connection, typically used
+// in WebSocket implementations. This is a necessary method to implement the http.Hijacker interface.
 func (r *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := r.ResponseWriter.(http.Hijacker)
 	if !ok {
@@ -37,21 +43,15 @@ func (r *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijacker.Hijack()
 }
 
-// Write writes data to the wrapped ResponseWriter and updates the size tracked in responseData.
-func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size
-	return size, err
-}
-
-// WriteHeader writes the HTTP status code to the wrapped ResponseWriter and records it in responseData.
-func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode
-}
-
 // WithLogging returns a middleware handler that logs details about each HTTP request and its response.
 // It logs the URI, method, duration, status, and response size.
+//
+// Parameters:
+//   - h: The HTTP handler to be wrapped by the middleware.
+//   - log: Logger for capturing and logging request and response details.
+//
+// Returns:
+//   - An HTTP handler that logs the details of each request and response.
 func WithLogging(h http.Handler, log *slog.Logger) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

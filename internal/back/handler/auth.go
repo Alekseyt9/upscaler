@@ -10,13 +10,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// POST
-func (h *FrontHandler) Register(w http.ResponseWriter, r *http.Request) {
-	// not implemented
-}
-
-// POST
-func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
+// Login handles the POST request for user login.
+// It checks the JWT token from the cookie and validates it.
+// If the token is missing, invalid, or expired, a new user is created,
+// and a new JWT token is generated and set as a cookie.
+//
+// Parameters:
+//   - w: The HTTP response writer.
+//   - r: The HTTP request for user login.
+//
+// Returns:
+//   - Responds with HTTP 200 if the login is successful, or an error status otherwise.
+func (h *ServerHandler) Login(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("jwt")
 	if err != nil || cookie.Value == "" {
 		_, err := h.createUserAndSetToken(w, r)
@@ -54,8 +59,17 @@ func (h *FrontHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GET
-func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
+// Login2 handles the GET request for user login and sets up a WebSocket connection.
+// It checks the JWT token, validates it, and establishes a WebSocket connection if successful.
+// If the JWT token is missing or invalid, it generates a new one.
+//
+// Parameters:
+//   - w: The HTTP response writer.
+//   - r: The HTTP request for user login and WebSocket connection.
+//
+// Returns:
+//   - Responds with a WebSocket connection or an error status if there is a failure.
+func (h *ServerHandler) Login2(w http.ResponseWriter, r *http.Request) {
 	var cookie *http.Cookie
 
 	cookie, err := r.Cookie("jwt")
@@ -85,8 +99,8 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 		userIDStr := claims["userId"].(string)
 		userID, err = strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
-			h.log.Error("Ошибка при парсинге userId", "error", err)
-			http.Error(w, "Ошибка при парсинге userId", http.StatusInternalServerError)
+			h.log.Error("Error parsing userId", "error", err)
+			http.Error(w, "Error parsing userId", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -102,8 +116,8 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
-		h.log.Error("Ошибка при установлении WebSocket соединения", "error", err)
-		http.Error(w, "Ошибка при установлении WebSocket соединения", http.StatusInternalServerError)
+		h.log.Error("Error establishing WebSocket connection", "error", err)
+		http.Error(w, "Error establishing WebSocket connection", http.StatusInternalServerError)
 		return
 	}
 
@@ -112,20 +126,29 @@ func (h *FrontHandler) Login2(w http.ResponseWriter, r *http.Request) {
 
 	defer conn.Close()
 
-	h.log.Info("Клиент подключен", "address", r.RemoteAddr)
+	h.log.Info("Client connected", "address", r.RemoteAddr)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			h.log.Info("Ошибка при чтении сообщения", "error", err)
+			h.log.Info("Error reading message", "error", err)
 			break
 		}
-		h.log.Info("recieved message", "message", msg)
+		h.log.Info("Received message", "message", msg)
 	}
 	h.ws.RemoveUser(userIDStr)
-	h.log.Info("Клиент отключен", "address", r.RemoteAddr)
+	h.log.Info("Client disconnected", "address", r.RemoteAddr)
 }
 
-func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) (*http.Cookie, error) {
+// createUserAndSetToken creates a new user in the system, generates a JWT token,
+// and sets it as a cookie in the response.
+//
+// Parameters:
+//   - w: The HTTP response writer.
+//   - r: The HTTP request for creating a user and setting the token.
+//
+// Returns:
+//   - A pointer to the created HTTP cookie or an error if the user or token generation fails.
+func (h *ServerHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) (*http.Cookie, error) {
 	id, err := h.store.CreateUser(r.Context())
 	if err != nil {
 		return nil, fmt.Errorf("store.CreateUser %w", err)
@@ -139,7 +162,7 @@ func (h *FrontHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Requ
 
 	tokenString, err := token.SignedString([]byte(h.opt.JWTSecret))
 	if err != nil {
-		return nil, fmt.Errorf("oшибка генерации токена %w", err)
+		return nil, fmt.Errorf("error generating token %w", err)
 	}
 
 	c := &http.Cookie{
