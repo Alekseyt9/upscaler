@@ -4,17 +4,19 @@ type BrokerMessage struct {
 	SrcFileURL    string
 	DestFileURL   string
 	DestFileKey   string
-	TaskId        int64
+	FileID        int64
 	FileExtension string
-	UserID        string
+	UserID        int64
+	QueueID       int64
 }
 
 type BrokerMessageResult struct {
-	TaskId      int64
 	Result      string
 	Error       string
 	DestFileKey string
-	UserID      string
+	UserID      int64
+	FileID      int64
+	QueueID     int64
 }
 
 type BrokerOptions struct {

@@ -70,11 +70,12 @@ func (p *ProcessorService) Process(ctx context.Context, msg model.BrokerMessage,
 		}
 
 		rmsg := model.BrokerMessageResult{
-			TaskId:      msg.TaskId,
+			FileID:      msg.FileID,
 			Result:      resMsg,
 			Error:       errMsg,
 			DestFileKey: msg.DestFileKey,
 			UserID:      msg.UserID,
+			QueueID:     msg.QueueID,
 		}
 
 		p.log.Info("sended msg", "message", rmsg)

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,7 +87,7 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 						 VALUES ($1, 'PENDING', $2)`
 
 	for _, task := range tasks {
-		var queueID int
+		var queueID int64
 		err = tx.QueryRow(ctx, insertQueueStmt).Scan(&queueID)
 		if err != nil {
 			return fmt.Errorf("tx.QueryRow insertQueueStmt %w", err)
@@ -104,10 +105,11 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 		payload := cmodel.BrokerMessage{
 			SrcFileURL:    task.SrcFileURL,
 			DestFileURL:   task.DestFileURL,
-			TaskId:        fileID,
+			FileID:        fileID,
 			FileExtension: filepath.Ext(task.FileName),
 			DestFileKey:   task.DestFileKey,
-			UserID:        strconv.FormatInt(task.UserID, 10),
+			UserID:        task.UserID,
+			QueueID:       queueID,
 		}
 		plJson, err := json.Marshal(payload)
 		if err != nil {
@@ -129,7 +131,7 @@ func (s *PostgresStore) CreateTasks(ctx context.Context, tasks []model.StoreTask
 }
 
 // GetState retrieves the user state based on the userId.
-func (s *PostgresStore) GetState(ctx context.Context, userId int64) ([]model.UserItem, error) {
+func (s *PostgresStore) GetState(ctx context.Context, userId int64) ([]model.ClientUserItem, error) {
 	query := `
 	WITH queue_positions AS (
 		SELECT 
@@ -159,10 +161,10 @@ func (s *PostgresStore) GetState(ctx context.Context, userId int64) ([]model.Use
 	}
 	defer rows.Close()
 
-	var userItems []model.UserItem
+	var userItems []model.ClientUserItem
 
 	for rows.Next() {
-		var item model.UserItem
+		var item model.ClientUserItem
 		err := rows.Scan(&item.Order, &item.FileName, &item.Link, &item.QueuePosition, &item.Status)
 		if item.Status == "PENDING" { // TODO to const
 			item.Link = ""
@@ -278,7 +280,7 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []model.FinishedTa
             FROM userfiles
             WHERE id = $1
         `
-		err = tx.QueryRow(ctx, getQueueIDStmt, msg.TaskId).Scan(&queueID)
+		err = tx.QueryRow(ctx, getQueueIDStmt, msg.FileID).Scan(&queueID)
 		if err != nil {
 			return fmt.Errorf("ошибка при получении queue_id: %w", err)
 		}
@@ -288,7 +290,7 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []model.FinishedTa
             SET state = $1, queue_id = NULL, dest_file_url = $3
             WHERE id = $2
         `
-		_, err = tx.Exec(ctx, updateUserFilesStmt, msg.Result, msg.TaskId, msg.DestFileURL)
+		_, err = tx.Exec(ctx, updateUserFilesStmt, msg.Result, msg.FileID, msg.DestFileURL)
 		if err != nil {
 			return fmt.Errorf("ошибка при обновлении userfiles: %w", err)
 		}
@@ -310,6 +312,73 @@ func (s *PostgresStore) FinishTasks(ctx context.Context, msgs []model.FinishedTa
 	}
 
 	return nil
+}
+
+// GetQueue retrieves all items from the queue.
+func (s *PostgresStore) GetQueue(ctx context.Context) ([]model.QueueItem, error) {
+	query := `SELECT id, order_num FROM queue ORDER BY order_num`
+
+	rows, err := s.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при выполнении запроса к очереди: %w", err)
+	}
+	defer rows.Close()
+
+	var queueItems []model.QueueItem
+
+	for rows.Next() {
+		var item model.QueueItem
+		if err := rows.Scan(&item.ID, &item.Order); err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании строки: %w", err)
+		}
+		queueItems = append(queueItems, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации по строкам: %w", err)
+	}
+
+	return queueItems, nil
+}
+
+// GetUserFiles retrieves all user files based on the userID.
+func (s *PostgresStore) GetUserFiles(ctx context.Context, userID int64) ([]UserItem, error) {
+	query := `SELECT id, queue_id, user_id, order_num, src_file_url, src_file_key, dest_file_url, dest_file_key, state, created_at, file_name
+              FROM userfiles
+              WHERE user_id = $1
+              ORDER BY order_num`
+
+	rows, err := s.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при выполнении запроса к userfiles: %w", err)
+	}
+	defer rows.Close()
+
+	var userFiles []UserItem
+
+	for rows.Next() {
+		var item UserItem
+		var queueID sql.NullInt64
+
+		if err := rows.Scan(&item.ID, &queueID, &item.UserID, &item.OrderNum, &item.SrcFileURL,
+			&item.SrcFileKey, &item.DestFileURL, &item.DestFileKey, &item.State, &item.CreatedAt, &item.FileName); err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании строки: %w", err)
+		}
+
+		if queueID.Valid {
+			item.QueueID = queueID.Int64 // Присваиваем значение, если оно не NULL
+		} else {
+			item.QueueID = 0 // Присваиваем 0, если значение NULL
+		}
+
+		userFiles = append(userFiles, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации по строкам: %w", err)
+	}
+
+	return userFiles, nil
 }
 
 // Close closes the connection pool.

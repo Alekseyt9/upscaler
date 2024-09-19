@@ -100,7 +100,7 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 		}
 
 		idempotencyKey := string(message.Key)
-		h.log.Info("consumer ConsumeClaim Получено сообщение", "TaskId", brokerMessage.TaskId,
+		h.log.Info("consumer ConsumeClaim Получено сообщение", "FileID", brokerMessage.FileID,
 			"SrcFileURL", brokerMessage.SrcFileURL, "DestFileURL", brokerMessage.DestFileURL)
 
 		err = h.proc.Process(context.Background(), brokerMessage, idempotencyKey)

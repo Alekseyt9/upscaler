@@ -2,6 +2,7 @@ package userserv
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
@@ -71,10 +72,12 @@ func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessa
 		}
 
 		tasks = append(tasks, model.FinishedTask{
-			TaskId:      m.TaskId,
+			FileID:      m.FileID,
 			Result:      m.Result,
 			Error:       m.Error,
 			DestFileURL: url,
+			UserID:      m.UserID,
+			QueueID:     m.QueueID,
 		})
 	}
 
@@ -84,7 +87,7 @@ func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessa
 	}
 
 	for _, m := range msgs {
-		err = u.ws.Send(m.UserID, "update")
+		err = u.ws.Send(strconv.FormatInt(m.UserID, 10), "update")
 		if err != nil {
 			return fmt.Errorf("userserv FinishTasks ws.Send %w", err)
 		}

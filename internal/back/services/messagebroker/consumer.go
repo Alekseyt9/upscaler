@@ -99,7 +99,7 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 			continue
 		}
 		h.log.Info("consumer ConsumeClaim Получено сообщение",
-			"TaskId", result.TaskId, "Result", result.Result, "Error", result.Error)
+			"FileID", result.FileID, "Result", result.Result, "Error", result.Error)
 
 		h.log.Info("consumer ConsumeClaim", "message", result)
 

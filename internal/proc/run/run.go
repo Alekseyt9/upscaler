@@ -29,7 +29,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 		return fmt.Errorf("s3store.New %w", err)
 	}
 
-	wp := workerpool.New(1) // there is no point in running upscale in parallel
+	wp := workerpool.New(1) // there is no point in running upscale in parallel, the utility eats up all the resources
 	fproc := fileprocessor.NewFileProcessor("util/", log)
 	idcheck := idcheck.NewIdCheckService(cfg.RedisAddr, 24*time.Hour)
 

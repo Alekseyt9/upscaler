@@ -10,7 +10,9 @@ type StoreTask struct {
 }
 
 type FinishedTask struct {
-	TaskId      int64
+	FileID      int64
+	UserID      int64
+	QueueID     int64
 	Result      string
 	Error       string
 	DestFileURL string
@@ -22,15 +24,20 @@ type UploadedFile struct {
 	Name string
 }
 
-type UserItem struct {
-	Order         int
+type ClientUserItem struct {
+	Order         int64
 	FileName      string
 	Link          string
-	QueuePosition int
+	QueuePosition int64
 	Status        string
 }
 
 type OutboxItem struct {
 	Payload string
 	IdKey   string
+}
+
+type QueueItem struct {
+	ID    int64
+	Order int64
 }
