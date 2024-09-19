@@ -17,5 +17,5 @@ func generateSecretKey() string {
 
 func main() {
 	secretKey := generateSecretKey()
-	fmt.Println("Your secret key:", secretKey)
+	fmt.Println("your secret key:", secretKey)
 }

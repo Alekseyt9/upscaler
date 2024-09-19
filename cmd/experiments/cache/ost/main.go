@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	test1()
 	test2()
 }
 
@@ -17,10 +18,10 @@ func test1() {
 	tree.Insert(ost.Int(20))
 	tree.Insert(ost.Int(30))
 	rank := tree.Rank(ost.Int(20))
-	fmt.Printf("Позиция элемента 20: %d\n", rank)
+	fmt.Printf("position of element 20: %d\n", rank)
 	tree.Delete(ost.Int(20))
 	rank = tree.Rank(ost.Int(30))
-	fmt.Printf("Позиция элемента 30: %d\n", rank)
+	fmt.Printf("position of element 30: %d\n", rank)
 }
 
 func test2() {

@@ -19,22 +19,22 @@ func main() {
 
 	err := rdb.Set(ctx, "mykey", "hello, redis!", 0).Err()
 	if err != nil {
-		log.Fatalf("Не удалось установить значение: %v", err)
+		log.Fatalf("Failed to set value: %v", err)
 	}
 
 	val, err := rdb.Get(ctx, "mykey").Result()
 	if err != nil {
-		log.Fatalf("Не удалось получить значение: %v", err)
+		log.Fatalf("Failed to get value: %v", err)
 	}
 
-	fmt.Printf("Значение ключа 'mykey': %s\n", val)
+	fmt.Printf("Value of key 'mykey': %s\n", val)
 
 	val2, err := rdb.Get(ctx, "nonexistent").Result()
 	if err == redis.Nil {
-		fmt.Println("Ключ 'nonexistent' не существует")
+		fmt.Println("Key 'nonexistent' does not exist")
 	} else if err != nil {
-		log.Fatalf("Ошибка при получении ключа: %v", err)
+		log.Fatalf("Error getting key: %v", err)
 	} else {
-		fmt.Printf("Значение ключа 'nonexistent': %s\n", val2)
+		fmt.Printf("Value of key 'nonexistent': %s\n", val2)
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Function to run an external utility asynchronously with specified input and output files
 func runExternalUtilityAsync(inputFile, outputFile string) error {
 	dir := "../../utils/realesrgan-ncnn-vulkan-20220424-ubuntu/"
 	cmd := exec.Command(dir+"realesrgan-ncnn-vulkan", "-i", dir+inputFile,
@@ -53,6 +52,6 @@ func main() {
 		fmt.Printf("Running test with %d processes...\n", numProcesses)
 		duration := measureExecutionTime(numProcesses, inputFile, outputFilePrefix)
 		fmt.Printf("Execution time with %d processes: %v\n", numProcesses, duration)
-		time.Sleep(1 * time.Second) // Sleep to avoid overlap and give time for process cleanup
+		time.Sleep(1 * time.Second)
 	}
 }
