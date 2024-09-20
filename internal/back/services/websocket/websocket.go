@@ -10,8 +10,21 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// WebSocketService defines the interface for managing WebSocket connections.
+type WebSocketService interface {
+	// AddUser adds a new user with a WebSocket connection.
+	AddUser(userID string, conn *websocket.Conn)
+
+	// RemoveUser removes a user from the service and closes their WebSocket connection.
+	RemoveUser(userID string)
+
+	// Send sends a message to a user by their userID.
+	// Returns an error if the message could not be sent.
+	Send(userID, message string) error
+}
+
 // WebSocketService manages WebSocket connections for users.
-type WebSocketService struct {
+type WebSocketServiceImpl struct {
 	Users map[string]*WSUser // Map of user IDs to their WebSocket connections.
 	mu    sync.Mutex         // Mutex for synchronizing access to the Users map.
 	log   *slog.Logger       // Logger for logging information and errors.
@@ -31,8 +44,8 @@ type WSUser struct {
 //
 // Returns:
 //   - A pointer to the newly created WebSocketService.
-func New(log *slog.Logger) *WebSocketService {
-	return &WebSocketService{
+func New(log *slog.Logger) *WebSocketServiceImpl {
+	return &WebSocketServiceImpl{
 		Users: make(map[string]*WSUser),
 		log:   log,
 	}
@@ -44,7 +57,7 @@ func New(log *slog.Logger) *WebSocketService {
 // Parameters:
 //   - userID: The unique identifier for the user.
 //   - conn: The WebSocket connection to be associated with the user.
-func (s *WebSocketService) AddUser(userID string, conn *websocket.Conn) {
+func (s *WebSocketServiceImpl) AddUser(userID string, conn *websocket.Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Users[userID] = &WSUser{
@@ -58,7 +71,7 @@ func (s *WebSocketService) AddUser(userID string, conn *websocket.Conn) {
 //
 // Parameters:
 //   - userID: The unique identifier of the user to be removed.
-func (s *WebSocketService) RemoveUser(userID string) {
+func (s *WebSocketServiceImpl) RemoveUser(userID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.Users, userID)
@@ -73,7 +86,7 @@ func (s *WebSocketService) RemoveUser(userID string) {
 //
 // Returns:
 //   - An error if the message could not be sent or if the user is not connected.
-func (s *WebSocketService) Send(userID, message string) error {
+func (s *WebSocketServiceImpl) Send(userID, message string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if user, ok := s.Users[userID]; ok {

@@ -27,9 +27,9 @@ type UserService interface {
 // UserService provides user-related services such as creating tasks, finishing tasks,
 // and interacting with the WebSocket and S3 storage services.
 type UserServiceImpl struct {
-	store   store.Store                 // Interface to interact with the data store.
-	s3store s3store.S3Store             // Interface to interact with S3 storage for file operations.
-	ws      *websocket.WebSocketService // WebSocket service for real-time communication with users.
+	store   store.Store                // Interface to interact with the data store.
+	s3store s3store.S3Store            // Interface to interact with S3 storage for file operations.
+	ws      websocket.WebSocketService // WebSocket service for real-time communication with users.
 }
 
 // New creates and returns a new instance of UserService.
@@ -41,7 +41,7 @@ type UserServiceImpl struct {
 //
 // Returns:
 //   - A pointer to the newly created UserService instance.
-func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketService) UserService {
+func New(store store.Store, s3store s3store.S3Store, ws websocket.WebSocketService) UserService {
 	return &UserServiceImpl{
 		store:   store,
 		s3store: s3store,
