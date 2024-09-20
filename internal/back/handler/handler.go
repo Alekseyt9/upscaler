@@ -16,7 +16,7 @@ type ServerHandler struct {
 	log   *slog.Logger                // Logger for capturing logs and error messages.
 	store store.Store                 // Data store interface for interacting with the application's database.
 	opt   HandlerOptions              // Options for the handler, such as the JWT secret.
-	us    *userserv.UserService       // User service for managing user-related operations.
+	us    userserv.UserService        // User service for managing user-related operations.
 	ws    *websocket.WebSocketService // WebSocket service for handling WebSocket communications.
 }
 
@@ -38,7 +38,7 @@ type HandlerOptions struct {
 // Returns:
 //   - A pointer to a newly created ServerHandler instance.
 func New(s3 s3store.S3Store, log *slog.Logger, store store.Store,
-	opt HandlerOptions, us *userserv.UserService, ws *websocket.WebSocketService) *ServerHandler {
+	opt HandlerOptions, us userserv.UserService, ws *websocket.WebSocketService) *ServerHandler {
 	return &ServerHandler{
 		s3:    s3,
 		log:   log,

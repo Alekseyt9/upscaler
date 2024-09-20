@@ -28,7 +28,7 @@ type Consumer struct {
 // ConsumerGroupHandler implements the sarama.ConsumerGroupHandler interface.
 // It processes messages consumed from Kafka and interacts with the UserService to finalize tasks.
 type ConsumerGroupHandler struct {
-	us  *userserv.UserService
+	us  userserv.UserService
 	log *slog.Logger
 }
 
@@ -42,7 +42,7 @@ type ConsumerGroupHandler struct {
 // Returns:
 //   - A pointer to a Consumer instance.
 //   - An error if there is an issue creating the Kafka consumer group.
-func NewConsumer(us *userserv.UserService, log *slog.Logger, opt cmodel.BrokerOptions) (*Consumer, error) {
+func NewConsumer(us userserv.UserService, log *slog.Logger, opt cmodel.BrokerOptions) (*Consumer, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Version = sarama.V2_6_0_0

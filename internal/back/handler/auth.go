@@ -14,13 +14,6 @@ import (
 // It checks the JWT token from the cookie and validates it.
 // If the token is missing, invalid, or expired, a new user is created,
 // and a new JWT token is generated and set as a cookie.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request for user login.
-//
-// Returns:
-//   - Responds with HTTP 200 if the login is successful, or an error status otherwise.
 func (h *ServerHandler) Login(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("jwt")
 	if err != nil || cookie.Value == "" {
@@ -62,13 +55,6 @@ func (h *ServerHandler) Login(w http.ResponseWriter, r *http.Request) {
 // Login2 handles the GET request for user login and sets up a WebSocket connection.
 // It checks the JWT token, validates it, and establishes a WebSocket connection if successful.
 // If the JWT token is missing or invalid, it generates a new one.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request for user login and WebSocket connection.
-//
-// Returns:
-//   - Responds with a WebSocket connection or an error status if there is a failure.
 func (h *ServerHandler) Login2(w http.ResponseWriter, r *http.Request) {
 	var cookie *http.Cookie
 
@@ -141,13 +127,6 @@ func (h *ServerHandler) Login2(w http.ResponseWriter, r *http.Request) {
 
 // createUserAndSetToken creates a new user in the system, generates a JWT token,
 // and sets it as a cookie in the response.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request for creating a user and setting the token.
-//
-// Returns:
-//   - A pointer to the created HTTP cookie or an error if the user or token generation fails.
 func (h *ServerHandler) createUserAndSetToken(w http.ResponseWriter, r *http.Request) (*http.Cookie, error) {
 	id, err := h.store.CreateUser(r.Context())
 	if err != nil {

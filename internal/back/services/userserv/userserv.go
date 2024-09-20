@@ -14,9 +14,19 @@ import (
 	"golang.org/x/net/context"
 )
 
+// UserService defines the interface for user-related services like creating tasks,
+// completing tasks, and interacting with the S3 and WebSocket services.
+type UserService interface {
+	// CreateTasks creates file processing tasks for a user.
+	CreateTasks(ctx context.Context, fileInfos []model.UploadedFile, userID int64) error
+
+	// FinishTasks marks file processing tasks as completed and sends updates to users via WebSocket.
+	FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error
+}
+
 // UserService provides user-related services such as creating tasks, finishing tasks,
 // and interacting with the WebSocket and S3 storage services.
-type UserService struct {
+type UserServiceImpl struct {
 	store   store.Store                 // Interface to interact with the data store.
 	s3store s3store.S3Store             // Interface to interact with S3 storage for file operations.
 	ws      *websocket.WebSocketService // WebSocket service for real-time communication with users.
@@ -31,8 +41,8 @@ type UserService struct {
 //
 // Returns:
 //   - A pointer to the newly created UserService instance.
-func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketService) *UserService {
-	return &UserService{
+func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketService) UserService {
+	return &UserServiceImpl{
 		store:   store,
 		s3store: s3store,
 		ws:      ws,
@@ -49,7 +59,7 @@ func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketServ
 //
 // Returns:
 //   - An error if there is a failure in generating URLs or creating tasks.
-func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.UploadedFile, userID int64) error {
+func (u *UserServiceImpl) CreateTasks(ctx context.Context, fileInfos []model.UploadedFile, userID int64) error {
 	// Generate presigned URLs for uploading files to S3.
 	dlinks, err := u.s3store.GetPresigned(len(fileInfos))
 	if err != nil {
@@ -94,7 +104,7 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 //
 // Returns:
 //   - An error if there is a failure in updating tasks or sending WebSocket notifications.
-func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
+func (u *UserServiceImpl) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
 	var tasks []model.FinishedTask
 
 	for _, m := range msgs {

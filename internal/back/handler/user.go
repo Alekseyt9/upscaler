@@ -14,13 +14,6 @@ import (
 // CompleteFilesUpload handles the POST request for completing file uploads.
 // It extracts the user ID from the JWT token, deserializes the list of uploaded files,
 // and creates tasks for processing the files.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request containing the uploaded files data.
-//
-// Returns:
-//   - Responds with HTTP 200 on success or an error status on failure.
 func (h *ServerHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Request) {
 	userID, ok := jwtcheker.GetUserID(r)
 	if !ok {
@@ -50,13 +43,6 @@ func (h *ServerHandler) CompleteFilesUpload(w http.ResponseWriter, r *http.Reque
 
 // GetUploadURLs handles the GET request to generate pre-signed URLs for file uploads.
 // It extracts the user ID from the JWT token and generates pre-signed URLs for file upload based on the provided count.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request containing the 'count' parameter for the number of upload URLs.
-//
-// Returns:
-//   - Responds with JSON-encoded pre-signed URLs or an error status on failure.
 func (h *ServerHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := jwtcheker.GetUserID(r)
 	if !ok {
@@ -92,13 +78,6 @@ func (h *ServerHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 
 // GetState handles the GET request to retrieve the state of uploaded files for the user.
 // It extracts the user ID from the JWT token and retrieves the current state of the user's files from the store.
-//
-// Parameters:
-//   - w: The HTTP response writer.
-//   - r: The HTTP request for retrieving the file state.
-//
-// Returns:
-//   - Responds with JSON-encoded file state or an error status on failure.
 func (h *ServerHandler) GetState(w http.ResponseWriter, r *http.Request) {
 	userID, ok := jwtcheker.GetUserID(r)
 	if !ok {
