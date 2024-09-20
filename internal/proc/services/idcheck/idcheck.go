@@ -65,3 +65,8 @@ func (s *IdCheckService) CheckAndSave(ctx context.Context, key string) bool {
 
 	return true
 }
+
+func (s *IdCheckService) Close() {
+	s.redisClient.FlushDB(context.TODO())
+	s.redisClient.Close()
+}

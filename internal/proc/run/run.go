@@ -69,6 +69,9 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 
 	cons.Close()
 	producer.Close()
+	idcheck.Close()
+
+	log.Info("Server shutdown completed")
 
 	return nil
 }
