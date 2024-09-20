@@ -1,4 +1,4 @@
-package store
+package cache
 
 import "github.com/Alekseyt9/upscaler/pkg/ost"
 

@@ -1,4 +1,4 @@
-package store
+package cache
 
 import (
 	"cmp"
@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/Alekseyt9/upscaler/internal/back/model"
+	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	"github.com/Alekseyt9/upscaler/pkg/lrulom"
 	"github.com/Alekseyt9/upscaler/pkg/ost"
 )
@@ -16,16 +17,16 @@ import (
 type CachedStore struct {
 	queue    *ost.POST
 	queuemap sync.Map
-	lru      *lrulom.LRULoadOnMiss[int64, map[int64]*UserFileItem]
-	dbstore  Store
+	lru      *lrulom.LRULoadOnMiss[int64, map[int64]*store.UserFileItem]
+	dbstore  store.Store
 	log      *slog.Logger
 }
 
-func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
+func NewCachedStore(s store.Store, log *slog.Logger) (*CachedStore, error) {
 	ctx := context.Background()
-	lruLoadFunc := func(key int64) (map[int64]*UserFileItem, error) {
-		v, err := store.GetUserFiles(ctx, key)
-		m := make(map[int64]*UserFileItem, len(v))
+	lruLoadFunc := func(key int64) (map[int64]*store.UserFileItem, error) {
+		v, err := s.GetUserFiles(ctx, key)
+		m := make(map[int64]*store.UserFileItem, len(v))
 		for _, item := range v {
 			m[item.ID] = &item
 		}
@@ -41,11 +42,11 @@ func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 		queue:    ost.NewPOST(),
 		queuemap: sync.Map{},
 		lru:      lru,
-		dbstore:  store,
+		dbstore:  s,
 		log:      log,
 	}
 
-	qs, err := store.GetQueue(ctx)
+	qs, err := s.GetQueue(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func NewCachedStore(store Store, log *slog.Logger) (*CachedStore, error) {
 	return cs, nil
 }
 
-func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []UserFileItem, error) {
+func (s *CachedStore) CreateTasks(ctx context.Context, tasks []model.StoreTask) ([]model.QueueItem, []store.UserFileItem, error) {
 	// First, create in the database, then add to the cache
 	qitems, filesitems, err := s.dbstore.CreateTasks(ctx, tasks)
 	if err != nil {
@@ -164,7 +165,7 @@ func (s *CachedStore) GetQueue(ctx context.Context) ([]model.QueueItem, error) {
 	return s.dbstore.GetQueue(ctx)
 }
 
-func (s *CachedStore) GetUserFiles(ctx context.Context, userID int64) ([]UserFileItem, error) {
+func (s *CachedStore) GetUserFiles(ctx context.Context, userID int64) ([]store.UserFileItem, error) {
 	return s.dbstore.GetUserFiles(ctx, userID)
 }
 

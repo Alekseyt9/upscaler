@@ -1,3 +1,5 @@
+// Package userserv provides the user-related services, including creating file processing tasks,
+// completing tasks, and interacting with the S3 store and WebSocket service.
 package userserv
 
 import (
@@ -12,12 +14,23 @@ import (
 	"golang.org/x/net/context"
 )
 
+// UserService provides user-related services such as creating tasks, finishing tasks,
+// and interacting with the WebSocket and S3 storage services.
 type UserService struct {
-	store   store.Store
-	s3store s3store.S3Store
-	ws      *websocket.WebSocketService
+	store   store.Store                 // Interface to interact with the data store.
+	s3store s3store.S3Store             // Interface to interact with S3 storage for file operations.
+	ws      *websocket.WebSocketService // WebSocket service for real-time communication with users.
 }
 
+// New creates and returns a new instance of UserService.
+//
+// Parameters:
+//   - store: Data store to manage tasks and file information.
+//   - s3store: S3 storage service to handle file operations.
+//   - ws: WebSocket service for notifying users.
+//
+// Returns:
+//   - A pointer to the newly created UserService instance.
 func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketService) *UserService {
 	return &UserService{
 		store:   store,
@@ -26,7 +39,18 @@ func New(store store.Store, s3store s3store.S3Store, ws *websocket.WebSocketServ
 	}
 }
 
+// CreateTasks creates file processing tasks for a user by generating download and destination URLs
+// and storing the tasks in the data store.
+//
+// Parameters:
+//   - ctx: Context for managing request deadlines and cancellation signals.
+//   - fileInfos: A slice of uploaded file information.
+//   - userID: The ID of the user creating the tasks.
+//
+// Returns:
+//   - An error if there is a failure in generating URLs or creating tasks.
 func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.UploadedFile, userID int64) error {
+	// Generate presigned URLs for uploading files to S3.
 	dlinks, err := u.s3store.GetPresigned(len(fileInfos))
 	if err != nil {
 		return fmt.Errorf("GetPresigned %w", err)
@@ -37,7 +61,7 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 		fileInfo := fileInfos[i]
 		dlink := dlinks[i]
 
-		// need to generate URL for downloading
+		// Generate a download URL for the source file.
 		dURL, err := u.s3store.GetPresignedLoad(fileInfo.Key)
 		if err != nil {
 			return fmt.Errorf("s3store.GetPresignedLoad %w", err)
@@ -62,10 +86,19 @@ func (u *UserService) CreateTasks(ctx context.Context, fileInfos []model.Uploade
 	return nil
 }
 
+// FinishTasks marks file processing tasks as completed and sends real-time updates to users via WebSocket.
+//
+// Parameters:
+//   - ctx: Context for managing request deadlines and cancellation signals.
+//   - msgs: A slice of task completion messages from the message broker.
+//
+// Returns:
+//   - An error if there is a failure in updating tasks or sending WebSocket notifications.
 func (u *UserService) FinishTasks(ctx context.Context, msgs []cmodel.BrokerMessageResult) error {
 	var tasks []model.FinishedTask
 
 	for _, m := range msgs {
+		// Generate a presigned download URL for the destination file.
 		url, err := u.s3store.GetPresignedLoad(m.DestFileKey)
 		if err != nil {
 			return fmt.Errorf("UserService.FinishTasks s3store.GetPresignedLoad %w", err)

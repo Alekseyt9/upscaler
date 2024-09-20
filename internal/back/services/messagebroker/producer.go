@@ -1,3 +1,5 @@
+// Package messagebroker provides functionality for producing messages to Kafka
+// from a store, allowing tasks to be sent in batches to a Kafka topic.
 package messagebroker
 
 import (
@@ -12,15 +14,28 @@ import (
 	"github.com/IBM/sarama"
 )
 
+// Producer is a struct that represents a Kafka message producer.
 type Producer struct {
-	store    store.Store
-	producer sarama.SyncProducer
-	topic    string
-	interval time.Duration
-	quit     chan struct{}
-	log      *slog.Logger
+	store    store.Store         // Store interface for retrieving tasks to send to Kafka.
+	producer sarama.SyncProducer // Kafka SyncProducer for sending messages synchronously.
+	topic    string              // Kafka topic to which the messages will be sent.
+	interval time.Duration       // Interval for batching and sending messages.
+	quit     chan struct{}       // Channel to signal stopping the message producer.
+	log      *slog.Logger        // Logger for capturing logs and errors.
 }
 
+// NewProducer creates and returns a new instance of Producer.
+// It initializes the Kafka producer, starts a goroutine for sending messages in batches,
+// and returns the configured Producer instance.
+//
+// Parameters:
+//   - store: The store from which tasks are retrieved for sending to Kafka.
+//   - log: A logger for capturing logs and errors.
+//   - opt: BrokerOptions containing Kafka broker addresses and the topic.
+//
+// Returns:
+//   - A pointer to a Producer instance.
+//   - An error if there is a problem creating the Kafka SyncProducer.
 func NewProducer(store store.Store, log *slog.Logger, opt cmodel.BrokerOptions) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
@@ -42,14 +57,13 @@ func NewProducer(store store.Store, log *slog.Logger, opt cmodel.BrokerOptions) 
 	}
 
 	go sender.startSending()
-
 	return sender, nil
 }
 
+// startSending starts a loop that triggers message sending at regular intervals.
 func (s *Producer) startSending() {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ticker.C:
@@ -64,6 +78,7 @@ func (s *Producer) startSending() {
 	}
 }
 
+// sendMessagesBatch retrieves tasks from the store and sends them to Kafka in batches.
 func (s *Producer) sendMessagesBatch() error {
 	err := s.store.SendTasksToBroker(context.Background(), func(items []model.OutboxItem) error {
 		var messages []*sarama.ProducerMessage
@@ -92,6 +107,7 @@ func (s *Producer) sendMessagesBatch() error {
 	return nil
 }
 
+// Close stops the producer and gracefully shuts down the Kafka producer.
 func (s *Producer) Close() {
 	close(s.quit)
 	s.producer.Close()

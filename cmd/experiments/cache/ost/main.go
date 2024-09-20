@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	"github.com/Alekseyt9/upscaler/internal/back/services/store/cache"
 	"github.com/Alekseyt9/upscaler/pkg/ost"
 )
 
@@ -26,7 +26,7 @@ func test1() {
 
 func test2() {
 	queue := ost.NewPOST()
-	o1 := store.CacheQueueItem{
+	o1 := cache.CacheQueueItem{
 		ID:    273,
 		Order: 273,
 	}

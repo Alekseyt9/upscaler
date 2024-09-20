@@ -18,6 +18,7 @@ import (
 	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/logger"
 	"github.com/Alekseyt9/upscaler/internal/back/services/messagebroker"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
+	"github.com/Alekseyt9/upscaler/internal/back/services/store/cache"
 	"github.com/Alekseyt9/upscaler/internal/back/services/userserv"
 	"github.com/Alekseyt9/upscaler/internal/back/services/websocket"
 	"github.com/Alekseyt9/upscaler/internal/common/model"
@@ -39,7 +40,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 		return fmt.Errorf("store.NewPostgresStore %w", err)
 	}
 
-	store, err := store.NewCachedStore(pgstore, log)
+	store, err := cache.NewCachedStore(pgstore, log)
 	if err != nil {
 		return fmt.Errorf("store.NewCachedStore %w", err)
 	}
