@@ -132,7 +132,7 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 //   - An http.Handler with all routes and middleware applied.
 //   - An error if setting up handlers fails.
 func Router(cfg *config.Config, log *slog.Logger, store store.Store, s3 s3store.S3Store,
-	us userserv.UserService, ws *websocket.WebSocketService) (http.Handler, error) {
+	us userserv.UserService, ws websocket.WebSocketService) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	setupFileServer(mux, log)
@@ -174,7 +174,7 @@ func setupMiddlware(h http.Handler, log *slog.Logger, cfg *config.Config) http.H
 // Returns:
 //   - An error if there is an issue setting up handlers.
 func setupHandlers(mux *http.ServeMux, cfg *config.Config, log *slog.Logger, store store.Store,
-	s3 s3store.S3Store, us userserv.UserService, ws *websocket.WebSocketService) error {
+	s3 s3store.S3Store, us userserv.UserService, ws websocket.WebSocketService) error {
 	ho := handler.HandlerOptions{
 		JWTSecret: cfg.JWTSecret,
 	}
