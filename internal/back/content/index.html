@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Processing Service</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .main {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .dropzone {
+            width: 50%;
+            height: 200px;
+            border: 2px dashed #007bff;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            cursor: pointer;
+        }
+        .queue-table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        .queue-table th, .queue-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px;
+            text-align: center;
+        }
+        .queue-table th {
+            background-color: #f8f9fa;
+        }
+        .queue-table img {
+            width: 30px;
+            height: 30px;
+            object-fit: cover;
+        }
+        .status-processed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status-outdated{
+            background-color: #eaeaea;
+            color: #4d4d4d;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="user-info">
+            <span>Anonymous</span>
+        </div>
+        <!--
+        <div class="login-button">
+            <button>Login</button>
+        </div>
+        -->
+    </div>
+
+    <div class="main">
+        <div class="dropzone" id="dropzone">
+            <p>Drag and drop files here for upload or click to select files</p>
+        </div>
+
+        <div id="loadingPanel" style="display: none;">
+            <p>Uploading files, please wait...</p>
+        </div>
+
+        <table class="queue-table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Download Link/Queue Position</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!--
+                <tr>
+                    <td>file1.jpg</td>
+                    <td>15</td>
+                    <td class="status-pending">Pending</td>
+                </tr>
+                <tr>
+                    <td>file2.jpg</td>
+                    <td><a href="https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDN8fGZvb2R8ZW58MHx8fHwxNjI5ODc1MjYy&ixlib=rb-1.2.1&q=80&w=200" download>Download</a></td>
+                    <td class="status-processed">Processed</td>
+                </tr>
+                <tr>
+                   <td>file3.jpg</td>
+                    <td><a href="https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDZ8fGxhbmRzY2FwZXxlbnwwfHx8fDE2Mjk4NzUyNjI&ixlib=rb-1.2.1&q=80&w=200" download>Download</a></td>
+                    <td class="status-processed">Processed</td>
+                </tr>
+                <tr>
+                    <td>file4.jpg</td>
+                    <td></td>
+                    <td class="status-error">Error</td>
+                </tr>
+                <tr>
+                    <td>file5.jpg</td>
+                    <td></td>
+                    <td class="status-outdated">Outdated</td>
+                </tr>
+                -->
+            </tbody>
+        </table>
+    </div>
+
+    <script src="content/script.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,2 @@
+ALTER TABLE userfiles
+ADD COLUMN file_name TEXT NOT NULL DEFAULT '';
