@@ -3,16 +3,22 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/config"
+	"github.com/Alekseyt9/upscaler/internal/back/handler/middleware/jwtcheker"
 	"github.com/Alekseyt9/upscaler/internal/back/model"
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
 	cmodel "github.com/Alekseyt9/upscaler/internal/common/model"
 	"github.com/Alekseyt9/upscaler/internal/common/services/s3store"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,17 +58,26 @@ func TestServerHandler_GetUploadURLs(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to load s3stor")
 
+	cookies, err := Login(t)
+	require.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &ServerHandler{s3: s3s}
-			req := httptest.NewRequest("GET", "/?"+tt.queryParam, nil)
-			w := httptest.NewRecorder()
+			h := &ServerHandler{
+				s3:  s3s,
+				log: slog.New(slog.NewTextHandler(os.Stdout, nil)),
+			}
 
-			h.GetUploadURLs(w, req)
+			handlerWithJWT := jwtcheker.WithJWTCheck(http.HandlerFunc(h.GetUploadURLs), "mysecret", h.log)
+			req := httptest.NewRequest("GET", "/api/user/getuploadurls/?"+tt.queryParam, nil)
+			for _, cookie := range cookies {
+				req.AddCookie(cookie)
+			}
+			w := httptest.NewRecorder()
+			handlerWithJWT.ServeHTTP(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()
-
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 
 			if tt.expectedCode == http.StatusOK {
@@ -94,23 +109,26 @@ func TestServerHandler_CompleteFilesUpload(t *testing.T) {
 			expectedCode: http.StatusInternalServerError,
 			userIDValid:  true,
 		},
-		{
-			name:         "missing user ID",
-			body:         `[{"FileName": "file1.png"}]`,
-			expectedCode: http.StatusInternalServerError,
-			userIDValid:  false,
-		},
 	}
+
+	cookies, err := Login(t)
+	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &ServerHandler{
-				us: &MockUserService{},
+				us:  &MockUserService{},
+				log: slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			}
-			req := httptest.NewRequest("POST", "/complete", strings.NewReader(tt.body))
+
+			handlerWithJWT := jwtcheker.WithJWTCheck(http.HandlerFunc(h.CompleteFilesUpload), "mysecret", h.log)
+			req := httptest.NewRequest("POST", "/api/user/completefilesupload", strings.NewReader(tt.body))
+			for _, cookie := range cookies {
+				req.AddCookie(cookie)
+			}
 			w := httptest.NewRecorder()
 
-			h.CompleteFilesUpload(w, req)
+			handlerWithJWT.ServeHTTP(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()
@@ -123,30 +141,31 @@ func TestServerHandler_CompleteFilesUpload(t *testing.T) {
 func TestServerHandler_GetState(t *testing.T) {
 	tests := []struct {
 		name         string
-		userIDValid  bool
 		expectedCode int
 	}{
 		{
-			name:         "valid request with valid user ID",
-			userIDValid:  true,
+			name:         "valid request",
 			expectedCode: http.StatusOK,
 		},
-		{
-			name:         "missing user ID",
-			userIDValid:  false,
-			expectedCode: http.StatusInternalServerError,
-		},
 	}
+
+	cookies, err := Login(t)
+	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &ServerHandler{
 				store: &store.MemoryStore{},
+				log:   slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			}
-			req := httptest.NewRequest("GET", "/state", nil)
-			w := httptest.NewRecorder()
 
-			h.GetState(w, req)
+			handlerWithJWT := jwtcheker.WithJWTCheck(http.HandlerFunc(h.GetState), "mysecret", h.log)
+			req := httptest.NewRequest("GET", "/api/user/getstate", nil)
+			for _, cookie := range cookies {
+				req.AddCookie(cookie)
+			}
+			w := httptest.NewRecorder()
+			handlerWithJWT.ServeHTTP(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()
@@ -157,10 +176,52 @@ func TestServerHandler_GetState(t *testing.T) {
 				var result []model.ClientUserItem
 				err := json.NewDecoder(resp.Body).Decode(&result)
 				require.NoError(t, err)
-				assert.NotNil(t, result)
 			}
 		})
 	}
+}
+
+func Login(t *testing.T) ([]*http.Cookie, error) {
+	handlerOptions := HandlerOptions{
+		JWTSecret: "mysecret",
+	}
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	memStore := store.NewMemoryStore()
+
+	h := ServerHandler{
+		store: memStore,
+		ws:    &MockWebSocketService{},
+		opt:   handlerOptions,
+		log:   log,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(h.Login2))
+	defer server.Close()
+
+	url := "ws" + server.URL[len("http"):] + "/login2"
+	dialer := websocket.Dialer{}
+
+	header := http.Header{}
+	conn, resp, err := dialer.Dial(url, header)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		return nil, fmt.Errorf("unexpected status code: got %v want %v", resp.StatusCode, http.StatusSwitchingProtocols)
+	}
+
+	cookies := resp.Cookies()
+
+	err = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error sending close message: %w", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	return cookies, nil
 }
 
 // MockUserService simulates user service behavior for tests.

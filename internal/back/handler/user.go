@@ -47,7 +47,7 @@ func (h *ServerHandler) GetUploadURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := jwtcheker.GetUserID(r)
 	if !ok {
 		h.log.Error("GetUserID", "not found", ok)
-		http.Error(w, "GetUserID", http.StatusInternalServerError)
+		http.Error(w, "GetUserID", http.StatusBadRequest)
 		return
 	}
 	h.log.Info("GetUserID", "userID", userID)

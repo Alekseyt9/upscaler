@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
-	"time"
 
 	"github.com/Alekseyt9/upscaler/internal/back/services/store"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 )
@@ -30,6 +30,7 @@ func TestLogin(t *testing.T) {
 	handlerOptions := HandlerOptions{
 		JWTSecret: "mysecret",
 	}
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	memStore := store.NewMemoryStore()
 
@@ -37,17 +38,10 @@ func TestLogin(t *testing.T) {
 		store: memStore,
 		ws:    mockWebSocket,
 		opt:   handlerOptions,
+		log:   log,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userId": "123",
-		"exp":    time.Now().Add(time.Hour).Unix(),
-	})
-	tokenString, _ := token.SignedString([]byte(handlerOptions.JWTSecret))
-	cookie := &http.Cookie{Name: "jwt", Value: tokenString}
-
 	req := httptest.NewRequest("POST", "/login", nil)
-	req.AddCookie(cookie)
 	w := httptest.NewRecorder()
 
 	h.Login(w, req)
@@ -64,47 +58,31 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogin2(t *testing.T) {
-	mockWebSocket := new(MockWebSocketService)
 	handlerOptions := HandlerOptions{
 		JWTSecret: "mysecret",
 	}
-
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	memStore := store.NewMemoryStore()
 
 	h := ServerHandler{
 		store: memStore,
-		ws:    mockWebSocket,
+		ws:    &MockWebSocketService{},
 		opt:   handlerOptions,
+		log:   log,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userId": "123",
-		"exp":    time.Now().Add(time.Hour).Unix(),
-	})
-	tokenString, _ := token.SignedString([]byte(handlerOptions.JWTSecret))
-	cookie := &http.Cookie{Name: "jwt", Value: tokenString}
+	server := httptest.NewServer(http.HandlerFunc(h.Login2))
+	defer server.Close()
 
-	req := httptest.NewRequest("GET", "/login2", nil)
-	req.AddCookie(cookie)
-	w := httptest.NewRecorder()
+	url := "ws" + server.URL[len("http"):] + "/login2"
+	dialer := websocket.Dialer{}
 
-	/*
-		upgrader := websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
-		}
+	header := http.Header{}
+	conn, resp, err := dialer.Dial(url, header)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
 
-		conn, _, err := upgrader.Upgrade(w, req, nil)
-		require.NoError(t, err)
-	*/
-
-	h.Login2(w, req)
-	resp := w.Result()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	req = httptest.NewRequest("GET", "/login2", nil)
-	w = httptest.NewRecorder()
-
-	h.Login2(w, req)
-	resp = w.Result()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	defer conn.Close()
+	err = conn.WriteMessage(websocket.TextMessage, []byte("test message"))
+	require.NoError(t, err)
 }
