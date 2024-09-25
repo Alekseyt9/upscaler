@@ -3,7 +3,7 @@
 package config
 
 import (
-	"github.com/Alekseyt9/upscaler/internal/common/envutils"
+	"github.com/Alekseyt9/upscaler/internal/common/utils"
 	"github.com/caarlos0/env"
 )
 
@@ -21,7 +21,7 @@ type Config struct {
 
 // LoadConfig loads the configuration settings from environment variables.
 func LoadConfig() (*Config, error) {
-	err := envutils.LoadEnv()
+	err := utils.LoadEnv()
 	if err != nil {
 		return nil, err
 	}

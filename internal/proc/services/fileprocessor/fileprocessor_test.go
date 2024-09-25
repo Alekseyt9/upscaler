@@ -9,17 +9,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Alekseyt9/upscaler/internal/common/utils"
 )
 
 func TestFileProcessor_Process_Success(t *testing.T) {
-	utilityDir := "./test-utility"
-	inputFile := filepath.Join("testdata", "input.png")
-	outputFile := filepath.Join("testdata", "output.png")
+	wd := filepath.Join(utils.GetProcDir(), "cmd", "proc", "util")
+	inputFile := filepath.Join(wd, "input.jpg")
+	outputFile := filepath.Join(wd, "output.jpg")
 
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
-
-	fp := NewFileProcessor(utilityDir, logger)
+	fp := NewFileProcessor(wd, logger)
 
 	_, err := os.Stat(inputFile)
 	require.NoError(t, err, "Input file does not exist")
